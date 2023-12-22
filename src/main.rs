@@ -1,115 +1,112 @@
 use std::{
-    fs,
     io::{prelude::*, BufReader, Lines},
     net::{TcpListener, TcpStream},
-    thread,
-    time::Duration,
-    process::Command
 };
-
-
 
 use hello::ThreadPool;
 
+pub mod HTML_helpers;
+use HTML_helpers::*;
+
+pub mod server_API;
+use server_API::*;
+
 
 fn main() {
+    // Opens socket for TCP connection. Over is for localhost and under is for production 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
-    let pool = ThreadPool::new(4);
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-        pool.execute(|| -> Result<(),()>{
-            handle_connection(stream)
-        });
+    let pool = ThreadPool::new(4); // Create a threadpool of 4 workers. 
+
+    for stream in listener.incoming() { // Loops through all incoming TCP connections wait when there are none left
+        if let Ok(stream) = stream { // If the connection is ok process the stream
+            pool.execute(|| -> Result<(),()>{ // Use on thread to process the stream
+                handle_connection(stream) 
+            });
+        }
     }
 }
 
 fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
-    let mut buf_reader = BufReader::new(&mut stream).lines();
-    
-    let request_string = next_line(&mut buf_reader)?;
 
-    let mut request_parts = request_string.split(" ")
+    let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
+    let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
+
+    // Push all the data from the buffer to the more convinient vector
+    for line in buf_reader{ 
+        match line {
+            Ok(string) => 
+                if string == "" { // Check if the string is empty. If it is the buffer is empty and if we don't break it will wait indefinetly  
+                    break;
+                } else {
+                request_header.push(string);
+                },
+            
+            Err(_) => continue
+        } 
+    }
+
+    if request_header.is_empty(){
+        return Ok(()); 
+    }
+
+    // Gets the URL that the client requested
+    let mut request_parts = request_header[0] // First line of header which contains the URL 
+        .split(" ") 
         .nth(1)
         .unwrap_or("/")
         .split("/");
     
 
-    request_parts.next();
+    request_parts.next(); // Skip the domain name/ip adress
 
-    let request_type = request_parts.next().unwrap_or("404");
+    let request_type = request_parts.next().unwrap_or("404"); // Gets the first string after "/" 
     
     //println!("{request_type}");
 
+    // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = match request_type {
-        "API" => api_request(request_parts.next().unwrap_or("")),
+        "API" => api_request(request_parts.next().unwrap_or(""), &request_header),
         "" => content_from_file("hello.html"),
         _ =>  content_from_file(request_type)
         
     };
 
     stream.write_all(response.as_bytes()).unwrap();
+    
     Ok(())
-
 }
 
-fn content_from_file(filename: &str) -> String{
-    //println!("{filename}");
-    match fs::read_to_string(filename) {
+fn api_request (api: &str, request_header: &Vec<String>) -> String{
 
-        Ok(content) => ok_header(&content),
-
-        Err(_) => {
-            let content = fs::read_to_string("404.html").expect("No 404 file");
-            error_header(&content)
-        },
-
+    let mut key: Option<String> = None;
+    
+    for part in request_header { 
+        if part.starts_with("Key")  {
+            key = Some(part.split_at(5).1.to_string());
+            break;
+        } else {
+            continue; 
+        };
     }
 
-}
-
-fn api_request (api: &str) -> String{
     match api {
-        "start" => start_machine(),
-        "stop" => stop_machine(),
+        "start" => start_machine(key),
+        "stop" => stop_machine(key),
         _ => error_header("Invalid API call"),
     }
 }
 
-fn start_machine() -> String{
-    // Send "sudo nohup /usr/local/bin/retrogame &"
-    Command::new("sh")
-        .arg("-c")
-        .arg("bash /home/pi/bashScripts/start.sh")
-        .spawn();
-    ok_header("Started machine succesfully")
-}
+fn check_key(key: Option<String>, correct_key: &str) -> Result<(), String>{
 
-fn stop_machine() -> String{
-    // Send "sudo pkill retrogame"
-    Command::new("sh")
-        .arg("-c")
-        .arg("bash /home/pi/bashScripts/stop.sh")
-        .output();
+    match key {
+        Some(key) => 
+            if key != correct_key{
+                return Err(unauthorized_header("Wrong key"));
+            }, 
+        None => return Err(unauthorized_header("No key"))
+    }
 
-    ok_header("Stopped machine succesfully")
-}
-
-fn error_header(content: &str) -> String{
-    format!("HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\n\r\n{content}", content.len())
-}
-
-fn ok_header(content: &str) -> String{
-    format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{content}", content.len())
-}
-
-fn next_line<'a>(lines: &'a mut Lines<BufReader<&mut TcpStream>>) -> Result<String, ()>{
-    Ok(match lines.next() {
-        None => return Err(()),        
-        Some(r) => match r {
-            Err(_) => return Err(()),
-            Ok(s) => s,
-        }   
-    })
+    Ok(())
 }
