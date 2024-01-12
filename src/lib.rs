@@ -39,7 +39,7 @@ impl ThreadPool {
 
     pub fn execute<F>(&self, f: F)
     where
-        F: FnOnce() -> Result<(),() >+ Send + 'static,
+        F: FnOnce() -> Result<(),() > + Send + 'static,
     {
         let job = Box::new(f);
 

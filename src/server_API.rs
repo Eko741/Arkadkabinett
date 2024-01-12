@@ -8,12 +8,14 @@ use std::{
 };
 
 pub fn start_machine(key: Option<String>) -> String{
-    let r = crate::check_key(key, ADMIN_KEY);
+    // Check if key is correct. Else return error header
+    let is_key_correct = crate::check_key(key, ADMIN_KEY);
     
-    if r.is_err() {
-        return r.unwrap_err();
+    if is_key_correct.is_err() {
+        return is_key_correct.unwrap_err();
     }
 
+    // Execute shell script to turns on machine input and output 
     match Command::new("sh")
         .arg("-c")
         .arg("bash /home/pi/bashScripts/start.sh")
@@ -27,12 +29,14 @@ pub fn start_machine(key: Option<String>) -> String{
 
 pub fn stop_machine(key: Option<String>) -> String{
 
+    // Check if key is correct. Else return error header
     let r = check_key(key, ADMIN_KEY);
     
     if r.is_err() {
         return r.unwrap_err();
     }
     
+    // Execute shell script to turns off machine input and output 
     match Command::new("sh")
         .arg("-c")
         .arg("bash /home/pi/bashScripts/stop.sh")
@@ -45,10 +49,9 @@ pub fn stop_machine(key: Option<String>) -> String{
     
 }
 
+// Generates an HTML response from a source file. If the passed source file does exist returns 404 
 pub fn content_from_file(filename: &str) -> String{
-    //println!("{filename}");
-
-
+    
     match fs::read_to_string(filename) {
 
         Ok(content) => ok_header(&content),

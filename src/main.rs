@@ -1,5 +1,5 @@
 use std::{
-    io::{prelude::*, BufReader, Lines},
+    io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
 };
 
@@ -18,10 +18,12 @@ fn main() {
     //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
 
     let pool = ThreadPool::new(4); // Create a threadpool of 4 workers. 
+    drop(pool);
+    let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() { // Loops through all incoming TCP connections wait when there are none left
         if let Ok(stream) = stream { // If the connection is ok process the stream
-            pool.execute(|| -> Result<(),()>{ // Use on thread to process the stream
+            pool.execute(|| -> Result<(),()>{ 
                 handle_connection(stream) 
             });
         }
@@ -33,7 +35,7 @@ fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
     let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
     let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
 
-    // Push all the data from the buffer to the more convinient vector
+    // Push all the data from the buffer reader to the more convinient vector
     for line in buf_reader{ 
         match line {
             Ok(string) => 
@@ -57,14 +59,13 @@ fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
         .nth(1)
         .unwrap_or("/")
         .split("/");
-    
+
 
     request_parts.next(); // Skip the domain name/ip adress
 
     let request_type = request_parts.next().unwrap_or("404"); // Gets the first string after "/" 
-    
-    //println!("{request_type}");
 
+    println!("{request_type}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = match request_type {
         "API" => api_request(request_parts.next().unwrap_or(""), &request_header),
@@ -73,17 +74,21 @@ fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
         
     };
 
+    // Writes the output to the TCP socket
     stream.write_all(response.as_bytes()).unwrap();
     
+    //Returns an empty Ok
     Ok(())
 }
 
 fn api_request (api: &str, request_header: &Vec<String>) -> String{
 
+    // Look for a key from the user
     let mut key: Option<String> = None;
     
     for part in request_header { 
         if part.starts_with("Key")  {
+            // If key is found 
             key = Some(part.split_at(5).1.to_string());
             break;
         } else {
@@ -91,6 +96,7 @@ fn api_request (api: &str, request_header: &Vec<String>) -> String{
         };
     }
 
+    
     match api {
         "start" => start_machine(key),
         "stop" => stop_machine(key),
@@ -99,7 +105,7 @@ fn api_request (api: &str, request_header: &Vec<String>) -> String{
 }
 
 fn check_key(key: Option<String>, correct_key: &str) -> Result<(), String>{
-
+    // Checks key and returns correct response
     match key {
         Some(key) => 
             if key != correct_key{
