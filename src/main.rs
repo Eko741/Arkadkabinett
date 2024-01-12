@@ -17,8 +17,6 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
 
-    let pool = ThreadPool::new(4); // Create a threadpool of 4 workers. 
-    drop(pool);
     let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() { // Loops through all incoming TCP connections wait when there are none left

@@ -1,9 +1,25 @@
 body {
     background-color: lightblue;
-  }
+}
   
-  h1 {
+h1 {
     color: navy;
     margin-left: 20px;
-  }
+}
+
+.button_container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.admin_button {
+  width: 100px;
+  height: 100px;
+}
+
+#info_box {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
 
