@@ -15,7 +15,7 @@ pub fn start_machine(key: Option<String>) -> String{
         return is_key_correct.unwrap_err();
     }
 
-    // Execute shell script to turns on machine input and output 
+    // Execute shell script to turn on machine input and output 
     match Command::new("sh")
         .arg("-c")
         .arg("bash /home/pi/bashScripts/start.sh")
@@ -36,7 +36,7 @@ pub fn stop_machine(key: Option<String>) -> String{
         return r.unwrap_err();
     }
     
-    // Execute shell script to turns off machine input and output 
+    // Execute shell script to turn off machine input and output 
     match Command::new("sh")
         .arg("-c")
         .arg("bash /home/pi/bashScripts/stop.sh")
@@ -52,12 +52,12 @@ pub fn stop_machine(key: Option<String>) -> String{
 // Generates an HTML response from a source file. If the passed source file does exist returns 404 
 pub fn content_from_file(filename: &str) -> String{
     
-    match fs::read_to_string(filename) {
+    match fs::read_to_string(format!("files/{filename}")) {
 
         Ok(content) => ok_header(&content),
 
         Err(_) => {
-            let content = fs::read_to_string("404.html").expect("No 404 file");
+            let content = fs::read_to_string("files/404.html").expect("No 404 file");
             error_header(&content)
         },
 
