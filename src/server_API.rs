@@ -1,15 +1,15 @@
 const ADMIN_KEY: &str = "3-0_tetris_attack";
 
-use crate::check_key;
+use crate::util::check_key;
 use crate::HTML_helpers::*;
 use std::{
     process::Command,
     fs,
 };
 
-pub fn start_machine(key: Option<String>) -> String{
+pub fn start_machine(key: String) -> String{
     // Check if key is correct. Else return error header
-    let is_key_correct = crate::check_key(key, ADMIN_KEY);
+    let is_key_correct = check_key(key, ADMIN_KEY);
     
     if is_key_correct.is_err() {
         return is_key_correct.unwrap_err();
@@ -27,13 +27,13 @@ pub fn start_machine(key: Option<String>) -> String{
     }
 }
 
-pub fn stop_machine(key: Option<String>) -> String{
+pub fn stop_machine(key: String) -> String{
 
     // Check if key is correct. Else return error header
-    let r = check_key(key, ADMIN_KEY);
+    let is_key_correct = check_key(key, ADMIN_KEY);
     
-    if r.is_err() {
-        return r.unwrap_err();
+    if is_key_correct.is_err() {
+        return is_key_correct.unwrap_err();
     }
     
     // Execute shell script to turn off machine input and output 
@@ -51,6 +51,8 @@ pub fn stop_machine(key: Option<String>) -> String{
 
 // Generates an HTML response from a source file. If the passed source file does exist returns 404 
 pub fn content_from_file(filename: &str) -> String{
+
+    //Should check for security issues in the filename
     
     match fs::read_to_string(format!("files/{filename}")) {
 

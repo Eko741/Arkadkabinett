@@ -1,25 +1,61 @@
-function start(){
-  const xhttpr = new XMLHttpRequest();
-  xhttpr.open('GET', 'API/start', true);
+var publicKeyPEM;
+var publicKey = "";
 
-  xhttpr.setRequestHeader("Key", document.getElementById("key").value);
+window.addEventListener('load', function () {
+  pki = forge.pki;
+})
+
+function displayInfo(){
+
+}
+
+function sendAPIRequest(API, key){
+  const request = new XMLHttpRequest();
+  request.open('GET', 'API/' + API, true);
+
+  //startRequest.setRequestHeader("Key", document.getElementById("key").value);
+  request.setRequestHeader("Key_Encrypted", encrypt_data(key));
+
+  request.send();
   
-  xhttpr.send();
-  
-  xhttpr.onload = ()=> {
-    alert(xhttpr.status + " " + xhttpr.statusText + " \r\n" + xhttpr.response);
+  request.onload = ()=> {
+    alert(request.status + " " + request.statusText + " \r\n" + request.response);
   };
 }
 
-function stop(){
-  const xhttpr = new XMLHttpRequest();
-  xhttpr.open('GET', 'API/stop', true);
 
-  xhttpr.setRequestHeader("Key", document.getElementById("key").value);
+function start(){
+  sendAPIRequest('start', document.getElementById("key").value);
+}
+
+function stop(){
+  sendAPIRequest('stop', document.getElementById("key").value);
+}
+
+function test(){
+  sendAPIRequest('test', document.getElementById("key").value);
+}
+
+
+function encrypt_data(data){
+  if (publicKey == ""){
+    const pubKeyRequest = new XMLHttpRequest();
+  
+    pubKeyRequest.open('GET', 'API/RSA_Key', false);
     
-  xhttpr.send();
+    pubKeyRequest.send();
     
-  xhttpr.onload = ()=> {
-    alert(xhttpr.status + " " + xhttpr.statusText + " \r\n" + xhttpr.response);
-  };
+    publicKeyPEM = pubKeyRequest.response;
+    publicKey = pki.publicKeyFromPem(publicKeyPEM);
+  }
+
+  var encrypted = publicKey.encrypt(data, 'RSA-OAEP', {
+    md: forge.md.sha256.create()
+  });
+
+  encrypted = forge.util.encode64(encrypted);
+  
+  console.log(encrypted);
+
+  return encrypted;
 }

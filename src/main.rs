@@ -11,8 +11,33 @@ use HTML_helpers::*;
 pub mod server_API;
 use server_API::*;
 
+pub mod security;
+use security::*;
+
+pub mod util;
+
+use rsa::{pkcs8::{EncodePublicKey, LineEnding}, RsaPrivateKey, RsaPublicKey};
+
+pub struct SharedMem {
+    pub public_key_encoded: String,
+    pub public_key: RsaPublicKey,
+    pub private_key: RsaPrivateKey,
+}
 
 fn main() {
+    let mut rng = rand::thread_rng();
+    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
+    let pub_key = RsaPublicKey::from(&priv_key);
+    
+    let pub_key_encoded = pub_key.to_public_key_pem(LineEnding::CRLF).expect("Failed to encode public key");
+
+    let shared_mem_arc = std::sync::Arc::new(SharedMem {
+            public_key: pub_key,    
+            public_key_encoded: pub_key_encoded,
+            private_key: priv_key,
+        }
+    );
+    
     // Opens socket for TCP connection. Over is for localhost and under is for production 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
@@ -21,14 +46,15 @@ fn main() {
 
     for stream in listener.incoming() { // Loops through all incoming TCP connections wait when there are none left
         if let Ok(stream) = stream { // If the connection is ok process the stream
-            pool.execute(|| -> Result<(),()>{ 
-                handle_connection(stream) 
+            let shared_mem_clone = std::sync::Arc::clone(&shared_mem_arc);
+            pool.execute(move || -> Result<(),()>{ 
+                handle_connection(stream, shared_mem_clone) 
             });
         }
     }
 }
 
-fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
+fn handle_connection(mut stream: TcpStream, shared_mem: std::sync::Arc<SharedMem>)  -> Result<(), ()>{
 
     let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
     let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
@@ -66,7 +92,7 @@ fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
     println!("{request_type}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = match request_type {
-        "API" => api_request(request_parts.next().unwrap_or(""), &request_header),
+        "API" => api_request(request_parts.next().unwrap_or(""), &request_header, shared_mem),
         "" => content_from_file("hello.html"),
         _ =>  content_from_file(request_type)
         
@@ -79,38 +105,27 @@ fn handle_connection(mut stream: TcpStream)  -> Result<(), ()>{
     Ok(())
 }
 
-fn api_request (api: &str, request_header: &Vec<String>) -> String{
+fn api_request (api: &str, request_header: &Vec<String>, shared_mem: std::sync::Arc<SharedMem>) -> String{
 
-    // Look for a key from the user
-    let mut key: Option<String> = None;
-    
-    for part in request_header { 
-        if part.starts_with("Key")  {
-            // If key is found 
-            key = Some(part.split_at(5).1.to_string());
-            break;
-        } else {
-            continue; 
-        };
+    // Non password secured api calls
+    match api {
+        "test"  => return error_header("No Testing Underway"),
+        "RSA_Key" => return ok_header(shared_mem.public_key_encoded.as_str()),
+        _ => ()
     }
-
     
+    // Gets password returns error if no key is found
+    let key = decrypt_header(request_header, &shared_mem, "Key_Encrypted");
+
+    let key = match key {
+        Ok(k) => k,
+        Err(err) => return unauthorized_header(&err)
+    };
+
+    // Password secured API calls
     match api {
         "start" => start_machine(key),
         "stop" => stop_machine(key),
         _ => error_header("Invalid API call"),
     }
-}
-
-fn check_key(key: Option<String>, correct_key: &str) -> Result<(), String>{
-    // Checks key and returns correct response
-    match key {
-        Some(key) => 
-            if key != correct_key{
-                return Err(unauthorized_header("Wrong key"));
-            }, 
-        None => return Err(unauthorized_header("No key"))
-    }
-
-    Ok(())
 }

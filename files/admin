@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <link rel="icon" href="favicon.svg"/>
-
     <script src="script.js"></script>
+    <script type="text/javascript" src="forge.min.js"></script>
     <link rel="stylesheet" href="style.css"> 
     <meta charset="utf-8">
     <title>Admin</title>
@@ -22,7 +22,7 @@
         <div class = "button_container">
         <button class = "admin_button" onclick="start()">Start</button>
         <button class = "admin_button" onclick="stop()">Stop</button>
-        <button class = "admin_button" onclick="WIP()">WIP</button>
+        <button class = "admin_button" onclick="test()">Test</button>
         <button class = "admin_button" onclick="WIP()">WIP</button>
         <button class = "admin_button" onclick="WIP()">WIP</button>
         <button class = "admin_button" onclick="WIP()">WIP</button>
