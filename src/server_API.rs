@@ -1,8 +1,9 @@
-const ADMIN_KEY: &str = "3-0_tetris_attack";
-
 use crate::util::check_key;
 use crate::HTML_helpers::*;
+use dotenv_codegen::dotenv;
 use std::{fs, process::Command};
+
+const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
 
 pub fn start_machine(key: String) -> String {
     // Check if key is correct. Else return error header

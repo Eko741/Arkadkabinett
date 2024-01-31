@@ -1,5 +1,5 @@
 [package]
-name = "hello"
+name = "arkadkabinett"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 base64 = "0.21.7"
 criterion = "0.5.1"
+dotenv = "0.15.0"
+dotenv_codegen = "0.15.0"
 rand = "0.8.5"
-    rsa = {version = "0.9.6", features = ["sha2"]}
+rsa = { version = "0.9.6", features = ["sha2"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
