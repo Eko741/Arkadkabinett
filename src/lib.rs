@@ -3,9 +3,21 @@ use std::{
     thread,
 };
 
+use rsa::{RsaPublicKey, RsaPrivateKey};
+
+pub mod security;
+
+#[allow(non_snake_case)]
+pub mod server_API;
+
+#[allow(non_snake_case)]
+pub mod HTML_helpers;
+
+pub mod util;
+
 pub struct ThreadPool {
     workers: Vec<Worker>, // The different threads that procces the http requests
-    sender: Option<mpsc::Sender<Box<dyn FnOnce() -> Result<(),()> + Send + 'static>>>, // The communication channel to distribute to http requests
+    sender: Option<mpsc::Sender<Job>>, // The communication channel to distribute to http requests
 }
 
 type Job = Box<dyn FnOnce() -> Result<(),()> + Send + 'static>;
@@ -54,7 +66,7 @@ impl ThreadPool {
     }
 }
 
-impl<'a> Drop for ThreadPool {
+impl Drop for ThreadPool {
     fn drop(&mut self) {
         // Drops the communication channel which also gives the workers Err when trying to receive a message  
         drop(self.sender.take());
@@ -110,3 +122,8 @@ impl Worker {
     }
 }
 
+pub struct SharedMem {
+    pub public_key_encoded: String,
+    pub public_key: RsaPublicKey,
+    pub private_key: RsaPrivateKey,
+}

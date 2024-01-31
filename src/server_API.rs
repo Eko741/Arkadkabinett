@@ -11,9 +11,9 @@ pub fn start_machine(key: String) -> String{
     // Check if key is correct. Else return error header
     let is_key_correct = check_key(key, ADMIN_KEY);
     
-    if is_key_correct.is_err() {
-        return is_key_correct.unwrap_err();
-    }
+    if let Err(err)  = is_key_correct{
+        return err;
+    } 
 
     // Execute shell script to turn on machine input and output 
     match Command::new("sh")
@@ -32,9 +32,9 @@ pub fn stop_machine(key: String) -> String{
     // Check if key is correct. Else return error header
     let is_key_correct = check_key(key, ADMIN_KEY);
     
-    if is_key_correct.is_err() {
-        return is_key_correct.unwrap_err();
-    }
+    if let Err(err)  = is_key_correct{
+        return err;
+    } 
     
     // Execute shell script to turn off machine input and output 
     match Command::new("sh")
@@ -53,14 +53,18 @@ pub fn stop_machine(key: String) -> String{
 pub fn content_from_file(filename: &str) -> String{
 
     //Should check for security issues in the filename
-    
     match fs::read_to_string(format!("files/{filename}")) {
 
-        Ok(content) => ok_header(&content),
+        Ok(content) => {
+            match content.split_once("\r\n") {
+                Some((content_type, page)) => ok_header_content_type(page, content_type),
+                None => internal_server_error_header("Internal server error")
+            }
+        },
 
         Err(_) => {
             let content = fs::read_to_string("files/404.html").expect("No 404 file");
-            error_header(&content)
+            error_header_content_type(&content, )
         },
 
     }

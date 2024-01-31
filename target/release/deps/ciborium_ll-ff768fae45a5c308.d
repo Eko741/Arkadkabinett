@@ -1,0 +1,11 @@
+C:\projects\hello\target\release\deps\libciborium_ll-ff768fae45a5c308.rmeta: C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\lib.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\dec.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\enc.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\hdr.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\seg.rs
+
+C:\projects\hello\target\release\deps\libciborium_ll-ff768fae45a5c308.rlib: C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\lib.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\dec.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\enc.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\hdr.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\seg.rs
+
+C:\projects\hello\target\release\deps\ciborium_ll-ff768fae45a5c308.d: C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\lib.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\dec.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\enc.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\hdr.rs C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\seg.rs
+
+C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\lib.rs:
+C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\dec.rs:
+C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\enc.rs:
+C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\hdr.rs:
+C:\Users\Deltagare\.cargo\registry\src\index.crates.io-6f17d22bba15001f\ciborium-ll-0.2.2\src\seg.rs:

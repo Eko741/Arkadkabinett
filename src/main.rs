@@ -4,27 +4,19 @@ use std::{
 };
 
 use hello::ThreadPool;
+use hello::SharedMem;
 
-pub mod HTML_helpers;
-use HTML_helpers::*;
+use hello::HTML_helpers::*;
 
-pub mod server_API;
-use server_API::*;
+use hello::server_API::*;
 
-pub mod security;
-use security::*;
-
-pub mod util;
+use hello::security::*;
 
 use rsa::{pkcs8::{EncodePublicKey, LineEnding}, RsaPrivateKey, RsaPublicKey};
 
-pub struct SharedMem {
-    pub public_key_encoded: String,
-    pub public_key: RsaPublicKey,
-    pub private_key: RsaPrivateKey,
-}
-
 fn main() {
+    // Generates a private and public RSA key. Stores them and a PEM representation of the public key
+    // in memory that's safely shared across threads
     let mut rng = rand::thread_rng();
     let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
     let pub_key = RsaPublicKey::from(&priv_key);
@@ -38,39 +30,36 @@ fn main() {
         }
     );
     
+    
+
     // Opens socket for TCP connection. Over is for localhost and under is for production 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
 
     let pool = ThreadPool::new(4);
+    
 
-    for stream in listener.incoming() { // Loops through all incoming TCP connections wait when there are none left
-        if let Ok(stream) = stream { // If the connection is ok process the stream
-            let shared_mem_clone = std::sync::Arc::clone(&shared_mem_arc);
-            pool.execute(move || -> Result<(),()>{ 
-                handle_connection(stream, shared_mem_clone) 
-            });
-        }
+    for stream in listener.incoming().flatten() { // Loops through all incoming TCP connections wait when there are none left
+        let shared_mem_clone = std::sync::Arc::clone(&shared_mem_arc);
+        pool.execute(move || -> Result<(),()>{ 
+            handle_connection(stream, shared_mem_clone) 
+        });
     }
 }
 
 fn handle_connection(mut stream: TcpStream, shared_mem: std::sync::Arc<SharedMem>)  -> Result<(), ()>{
 
-    let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
     let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
 
     // Push all the data from the buffer reader to the more convinient vector
-    for line in buf_reader{ 
-        match line {
-            Ok(string) => 
-                if string == "" { // Check if the string is empty. If it is the buffer is empty and if we don't break it will wait indefinetly  
-                    break;
-                } else {
-                request_header.push(string);
-                },
-            
-            Err(_) => continue
-        } 
+    let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
+    
+    for line in buf_reader.flatten(){ 
+        if line.is_empty() { // If it is the buffer is empty and if we don't break it will wait indefinetly  
+            break;
+        } else {
+            request_header.push(line);
+        }
     }
 
     if request_header.is_empty(){
@@ -79,15 +68,15 @@ fn handle_connection(mut stream: TcpStream, shared_mem: std::sync::Arc<SharedMem
 
     // Gets the URL that the client requested
     let mut request_parts = request_header[0] // First line of header which contains the URL 
-        .split(" ") 
+        .split(' ') 
         .nth(1)
         .unwrap_or("/")
-        .split("/");
+        .split('/');
 
 
     request_parts.next(); // Skip the domain name/ip adress
 
-    let request_type = request_parts.next().unwrap_or("404"); // Gets the first string after "/" 
+    let request_type = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/" 
 
     println!("{request_type}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
@@ -97,6 +86,7 @@ fn handle_connection(mut stream: TcpStream, shared_mem: std::sync::Arc<SharedMem
         _ =>  content_from_file(request_type)
         
     };
+    //println!("{}", response);
 
     // Writes the output to the TCP socket
     stream.write_all(response.as_bytes()).unwrap();

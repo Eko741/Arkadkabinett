@@ -7,5 +7,13 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.21.7"
+criterion = "0.5.1"
 rand = "0.8.5"
     rsa = {version = "0.9.6", features = ["sha2"]}
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmarks"
+harness = false

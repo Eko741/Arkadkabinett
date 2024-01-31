@@ -1,3 +1,4 @@
+text/javascript
 var publicKeyPEM;
 var publicKey = "";
 
