@@ -75,18 +75,15 @@ fn handle_connection(
 
     request_parts.next(); // Skip the domain name/ip adress
 
-    let request_type = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
+    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
+    let second_part = request_parts.next().unwrap_or("404.html"); // Gets the second string after "/"
 
-    println!("{request_type}");
+    println!("{first_part}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = match request_type {
-        "API" => api_request(
-            request_parts.next().unwrap_or(""),
-            &request_header,
-            shared_mem,
-        ),
-        "" => content_from_file("arkadkabinett.html"),
-        _ => content_from_file(request_type),
+    let response: String = match first_part {
+        "API" => api_request(second_part, &request_header, shared_mem),
+        "" => content_from_file("home.html"),
+        _ => content_from_file(first_part),
     };
     //println!("{}", response);
 

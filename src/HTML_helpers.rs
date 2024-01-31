@@ -33,9 +33,9 @@ pub fn ok_header_content_type(content: &str, content_type: &str) -> String {
     )
 }
 
-pub fn error_header_content_type(content: &str) -> String {
+pub fn error_header_content_type(content: &str, content_type: &str) -> String {
     format!(
-        "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\n\r\n{content}",
+        "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: {content_type}\r\n\r\n{content}",
         content.len()
     )
 }

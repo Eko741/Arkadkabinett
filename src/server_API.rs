@@ -54,9 +54,19 @@ pub fn content_from_file(filename: &str) -> String {
             None => internal_server_error_header("Internal server error"),
         },
 
-        Err(_) => {
-            let content = fs::read_to_string("files/404.html").expect("No 404 file");
-            error_header_content_type(&content)
-        }
+        Err(_) => match fs::read_to_string(format!("files/{filename}.html")) {
+            Ok(content) => match content.split_once("\r\n") {
+                Some((content_type, page)) => ok_header_content_type(page, content_type),
+                None => internal_server_error_header("Internal server error"),
+            },
+
+            Err(_) => {
+                let content = fs::read_to_string("files/404.html").expect("No 404 file");
+                match content.split_once("\r\n") {
+                    Some((content_type, page)) => error_header_content_type(page, content_type),
+                    None => internal_server_error_header("Internal server error"),
+                }
+            }
+        },
     }
 }
