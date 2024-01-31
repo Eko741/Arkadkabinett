@@ -48,6 +48,7 @@ pub fn stop_machine(key: String) -> String {
 // Generates an HTML response from a source file. If the passed source file does exist returns 404
 pub fn content_from_file(filename: &str) -> String {
     //Should check for security issues in the filename
+
     match fs::read_to_string(format!("files/{filename}")) {
         Ok(content) => match content.split_once("\r\n") {
             Some((content_type, page)) => ok_header_content_type(page, content_type),
