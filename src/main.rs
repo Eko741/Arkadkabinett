@@ -76,13 +76,14 @@ fn handle_connection(
     request_parts.next(); // Skip the domain name/ip adress
 
     let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
-    let second_part = request_parts.next().unwrap_or("404.html"); // Gets the second string after "/"
+    let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
 
     println!("{first_part}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = match first_part {
         "API" => api_request(second_part, &request_header, shared_mem),
-        "" => content_from_file("home.html"),
+        "admin" => protected_content_from_file(second_part),
+        "" => content_from_file("index.html"),
         _ => content_from_file(first_part),
     };
     //println!("{}", response);

@@ -45,6 +45,13 @@ pub fn stop_machine(key: String) -> String {
     }
 }
 
+pub fn protected_content_from_file(filename: &str) -> String {
+    match filename {
+        "" => content_from_file("admin/index.html"),
+        _ => content_from_file(("admin/".to_string() + filename).as_str()),
+    }
+}
+
 // Generates an HTML response from a source file. If the passed source file does exist returns 404
 pub fn content_from_file(filename: &str) -> String {
     //Should check for security issues in the filename
