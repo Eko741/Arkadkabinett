@@ -3,7 +3,7 @@ use std::{
     thread,
 };
 
-use rsa::{RsaPublicKey, RsaPrivateKey};
+use rsa::{RsaPrivateKey, RsaPublicKey};
 
 pub mod security;
 
@@ -20,7 +20,7 @@ pub struct ThreadPool {
     sender: Option<mpsc::Sender<Job>>, // The communication channel to distribute to http requests
 }
 
-type Job = Box<dyn FnOnce() -> Result<(),()> + Send + 'static>;
+type Job = Box<dyn FnOnce() -> Result<(), ()> + Send + 'static>;
 
 impl ThreadPool {
     /// Create a new ThreadPool.
@@ -56,7 +56,7 @@ impl ThreadPool {
     // Executes a function with the correct signature. Used the handle one http request
     pub fn execute<F>(&self, f: F)
     where
-        F: FnOnce() -> Result<(),() > + Send + 'static,
+        F: FnOnce() -> Result<(), ()> + Send + 'static,
     {
         // Put the box in a container to be sent to a thread
         let job = Box::new(f);
@@ -68,10 +68,10 @@ impl ThreadPool {
 
 impl Drop for ThreadPool {
     fn drop(&mut self) {
-        // Drops the communication channel which also gives the workers Err when trying to receive a message  
+        // Drops the communication channel which also gives the workers Err when trying to receive a message
         drop(self.sender.take());
 
-        // Collects all the workers and joins the threads 
+        // Collects all the workers and joins the threads
         for worker in &mut self.workers {
             println!("Shutting down worker {}", worker.id);
 
@@ -87,18 +87,18 @@ struct Worker {
     thread: Option<thread::JoinHandle<()>>,
 }
 
-// Takes an id and the reciving end of the communction channel to the main thread. 
+// Takes an id and the reciving end of the communction channel to the main thread.
 // Starts a thread that loops forever or until it gets erroneous data.
 
 impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
-        let thread = thread::spawn(move || loop { 
-            // Acquire the mutex if it's already taken by another thread it waits 
+        let thread = thread::spawn(move || loop {
+            // Acquire the mutex if it's already taken by another thread it waits
             // Then waits for something to be sent through the communication channel
-            let message = receiver.lock().unwrap().recv(); 
+            let message = receiver.lock().unwrap().recv();
 
             match message {
-                // If the message is Ok execute the function 
+                // If the message is Ok execute the function
                 Ok(job) => {
                     println!("Worker {id} got a job; executing.");
 
