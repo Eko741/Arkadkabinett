@@ -12,6 +12,7 @@ dotenv = "0.15.0"
 dotenv_codegen = "0.15.0"
 rand = "0.8.5"
 rsa = { version = "0.9.6", features = ["sha2"] }
+sha256 = "1.5.0"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
 };
@@ -67,26 +68,40 @@ fn handle_connection(
     }
 
     // Gets the URL that the client requested
-    let mut request_parts = request_header[0] // First line of header which contains the URL
+    let url = request_header[0] // First line of header which contains the URL
         .split(' ')
         .nth(1)
-        .unwrap_or("/")
-        .split('/');
+        .unwrap_or("/");
+
+    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
+
+    let mut form_data: HashMap<&str, &str> = HashMap::new();
+    for d in url.split('?').nth(1).unwrap_or("").split('&') {
+        let mut data = d.split('=');
+
+        let key = data.next();
+        let value = data.next();
+
+        if (key.is_none()) || (value.is_none()) {
+            continue;
+        }
+
+        form_data.insert(key.unwrap(), value.unwrap());
+    }
 
     request_parts.next(); // Skip the domain name/ip adress
 
     let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
     let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
+    println!("{} {}", first_part, second_part);
 
-    println!("{first_part}");
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = match first_part {
-        "API" => api_request(second_part, &request_header, shared_mem),
-        "admin" => protected_content_from_file(second_part),
+        "API" => api_request(second_part, &request_header, &form_data, shared_mem),
+        "admin" => protected_content_from_file(second_part, &request_header),
         "" => content_from_file("index.html"),
         _ => content_from_file(first_part),
     };
-    //println!("{}", response);
 
     // Writes the output to the TCP socket
     stream.write_all(response.as_bytes()).unwrap();
@@ -98,12 +113,14 @@ fn handle_connection(
 fn api_request(
     api: &str,
     request_header: &Vec<String>,
+    form_data: &HashMap<&str, &str>,
     shared_mem: std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
     match api {
         "test" => return error_header("No Testing Underway"),
         "RSA_Key" => return ok_header(shared_mem.public_key_encoded.as_str()),
+        "login" => return login(form_data),
         _ => (),
     }
 

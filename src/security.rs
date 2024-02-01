@@ -1,11 +1,10 @@
-use crate::SharedMem;
+use crate::{util::find_header_val, SharedMem};
 
 use ::rsa::{sha2::Sha256, Oaep};
 use rsa::RsaPrivateKey;
 
 use base64::{engine::general_purpose, Engine as _};
 
-use crate::util::find_val;
 // Decrypts a value from the request header
 pub fn decrypt_header(
     request_header: &Vec<String>,
@@ -13,7 +12,7 @@ pub fn decrypt_header(
     header: &str,
 ) -> Result<String, String> {
     // Finds the encrypted message in the request header
-    let m_encrypted_base64: String = match find_val(request_header, header) {
+    let m_encrypted_base64: String = match find_header_val(request_header, header) {
         Some(m) => m,
         None => return Err("No key".to_string()),
     };
@@ -23,8 +22,6 @@ pub fn decrypt_header(
         Ok(s) => s,
         Err(err) => return Err(err),
     };
-
-    println!("{m_decrypted_string}");
 
     Ok(m_decrypted_string)
 }
