@@ -1,4 +1,4 @@
-text/javascript
+const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 var publicKeyPEM;
 var publicKey = "";
 
@@ -6,8 +6,24 @@ window.addEventListener('load', function () {
   pki = forge.pki;
 })
 
-function displayInfo(){
+async function  color_alert(element, color_start, color_end) {
+  element.style.transitionDuration = "0s";
+  element.style.backgroundColor = color_start;
+  await sleep(10);
+  element.style.transitionDuration = "0.2s";
+  element.style.backgroundColor = color_end;
+}
 
+function handle_response(request) {
+  const info_box = document.getElementById("info_box");
+
+  info_box.innerHTML = request.status + " " + request.statusText + "<br>" + request.response;
+  
+  
+  if (request.status == "200")
+    color_alert(info_box, "#aaffaa", "#22ee22");
+  else
+    color_alert(info_box, "#ffaaaa", "#ff2222");
 }
 
 function sendAPIRequest(API, key){
@@ -20,7 +36,7 @@ function sendAPIRequest(API, key){
   request.send();
   
   request.onload = ()=> {
-    alert(request.status + " " + request.statusText + " \r\n" + request.response);
+    handle_response(request);
   };
 }
 

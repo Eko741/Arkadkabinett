@@ -46,27 +46,36 @@ pub fn stop_machine(key: String) -> String {
 }
 
 // Generates an HTML response from a source file. If the passed source file does exist returns 404
-pub fn content_from_file(filename: &str) -> String {
-    //Should check for security issues in the filename
+pub fn htpp_response_from_file(filename: &str) -> String {
+    
+    // !! 
+    //Should check for security issues in the filename. Sigge varsegod.
+    // !!
+
+    // If no file extension was given assume it's HTML
+    let filename = if !filename.contains('.') {
+        format!("{filename}.html")
+    } else {
+        filename.to_string()
+    };
+
+    // Finds postion of last '/' to extract to content type from the filename
+    let pos = match filename.rfind('/')  {
+        Some(pos) => pos,
+        None => return error_header(fs::read_to_string("files/404.html").expect("No 404 file").as_str())
+    };
+
+    // Extracts the content type from the filename. 
+    // If there is no content type in the filename assume it's an HTML file
+    let content_type = 
+        if pos == 0 {
+            "text/html"
+        } else {
+            &filename[1..pos]
+        };
+
     match fs::read_to_string(format!("files/{filename}")) {
-        Ok(content) => match content.split_once("\r\n") {
-            Some((content_type, page)) => ok_header_content_type(page, content_type),
-            None => internal_server_error_header("Internal server error"),
-        },
-
-        Err(_) => match fs::read_to_string(format!("files/{filename}.html")) {
-            Ok(content) => match content.split_once("\r\n") {
-                Some((content_type, page)) => ok_header_content_type(page, content_type),
-                None => internal_server_error_header("Internal server error"),
-            },
-
-            Err(_) => {
-                let content = fs::read_to_string("files/404.html").expect("No 404 file");
-                match content.split_once("\r\n") {
-                    Some((content_type, page)) => error_header_content_type(page, content_type),
-                    None => internal_server_error_header("Internal server error"),
-                }
-            }
-        },
+        Ok(content) => ok_header_content_type(content.as_str(), content_type),
+        Err(_) => error_header(fs::read_to_string("files/404.html").expect("No 404 file").as_str())
     }
 }

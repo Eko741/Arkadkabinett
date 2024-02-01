@@ -3,33 +3,20 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use arkadkabinett::security::*;
+use arkadkabinett::{security::*, util::find_url_from_header};
 use arkadkabinett::server_API::*;
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::SharedMem;
 use arkadkabinett::ThreadPool;
 
-use rsa::{
-    pkcs8::{EncodePublicKey, LineEnding},
-    RsaPrivateKey, RsaPublicKey,
-};
-
 fn main() {
-    // Generates a private and public RSA key. Stores them and a PEM representation of the public key
-    // in memory that's safely shared across threads
-    let mut rng = rand::thread_rng();
-    let priv_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate a key");
-    let pub_key = RsaPublicKey::from(&priv_key);
-
-    let pub_key_encoded = pub_key
-        .to_public_key_pem(LineEnding::CRLF)
-        .expect("Failed to encode public key");
-
-    let shared_mem_arc = std::sync::Arc::new(SharedMem {
-        public_key: pub_key,
-        public_key_encoded: pub_key_encoded,
-        private_key: priv_key,
-    });
+    // Shared memory that's safely shared across threads. Read only
+    let shared_mem_arc = std::sync::Arc::new( 
+        SharedMem{
+            rsa_key : generate_key_pair()
+            // More read only data can be added through the SharedMem struct 
+        }
+    );
 
     // Opens socket for TCP connection. Over is for localhost and under is for production
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -42,6 +29,7 @@ fn main() {
         let shared_mem_clone = std::sync::Arc::clone(&shared_mem_arc);
         pool.execute(move || -> Result<(), ()> { handle_connection(stream, shared_mem_clone) });
     }
+
 }
 
 fn handle_connection(
@@ -62,32 +50,27 @@ fn handle_connection(
         }
     }
 
+    // Check that the request header isn't empty
     if request_header.is_empty() {
         return Ok(());
     }
 
-    // Gets the URL that the client requested
-    let mut request_parts = request_header[0] // First line of header which contains the URL
-        .split(' ')
-        .nth(1)
-        .unwrap_or("/")
-        .split('/');
+    let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
 
-    request_parts.next(); // Skip the domain name/ip adress
-
-    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
-    let second_part = request_parts.next().unwrap_or("404.html"); // Gets the second string after "/"
-
-    println!("{first_part}");
-    // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = match first_part {
-        "API" => api_request(second_part, &request_header, shared_mem),
-        "" => content_from_file("home.html"),
-        _ => content_from_file(first_part),
-    };
-    //println!("{}", response);
-
+    let response: String = 
+        if url.starts_with("/API/") {
+            // If it's an API call
+            api_request(url, &request_header, shared_mem)
+        } else if url == "/" {
+            // If no spcific page was requested return the homepage
+            htpp_response_from_file("/home.hmtl")
+        } else {
+            // Get content from the file
+            htpp_response_from_file(url)
+        };
+    
     // Writes the output to the TCP socket
+    // Should handle error better. 
     stream.write_all(response.as_bytes()).unwrap();
 
     //Returns an empty Ok
@@ -95,14 +78,18 @@ fn handle_connection(
 }
 
 fn api_request(
-    api: &str,
+    api_name: &str,
     request_header: &Vec<String>,
     shared_mem: std::sync::Arc<SharedMem>,
 ) -> String {
+    
+    // Remove "/API/" from the start
+    let api_name = &api_name[5..];
+
     // Non password secured api calls
-    match api {
+    match api_name {
         "test" => return error_header("No Testing Underway"),
-        "RSA_Key" => return ok_header(shared_mem.public_key_encoded.as_str()),
+        "RSA_Key" => return ok_header(shared_mem.rsa_key.public_key_encoded.as_str()),
         _ => (),
     }
 
@@ -111,11 +98,11 @@ fn api_request(
 
     let key = match key {
         Ok(k) => k,
-        Err(err) => return unauthorized_header(&err),
+        Err(err) => return unauthorized_header(err.as_str()),
     };
 
     // Password secured API calls
-    match api {
+    match api_name {
         "start" => start_machine(key),
         "stop" => stop_machine(key),
         _ => error_header("Invalid API call"),
