@@ -57,13 +57,14 @@ fn handle_connection(
 
     let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
 
+    println!(":{url}:");
     let response: String = 
         if url.starts_with("/API/") {
             // If it's an API call
             api_request(url, &request_header, shared_mem)
         } else if url == "/" {
             // If no spcific page was requested return the homepage
-            htpp_response_from_file("/home.hmtl")
+            htpp_response_from_file("/home.html")
         } else {
             // Get content from the file
             htpp_response_from_file(url)
