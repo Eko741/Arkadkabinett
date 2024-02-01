@@ -68,10 +68,7 @@ pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> Stri
 
     let cookies = match find_header_val(&header, "Cookie") {
         Some(s) => s,
-        None => {
-            println!("No cookies");
-            return redirect_header("/login");
-        }
+        None => return redirect_header("/login"),
     }
     .split("; ")
     .map(String::from)
@@ -79,17 +76,11 @@ pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> Stri
 
     let session = match find_cookie_val(&cookies, "session") {
         Some(s) => s,
-        None => {
-            println!("No session");
-            return redirect_header("/login");
-        }
+        None => return redirect_header("/login"),
     };
     let session_created: u64 = match find_cookie_val(&cookies, "session-created") {
         Some(s) => s.parse().unwrap(),
-        None => {
-            println!("No session created");
-            return redirect_header("/login");
-        }
+        None => return redirect_header("/login"),
     };
 
     let session_active = (session_created + 3600)
