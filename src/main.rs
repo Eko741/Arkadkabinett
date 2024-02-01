@@ -57,7 +57,6 @@ fn handle_connection(
 
     let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
 
-    println!(":{url}:");
     let response: String = 
         if url.starts_with("/API/") {
             // If it's an API call
