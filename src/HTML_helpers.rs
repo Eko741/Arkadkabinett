@@ -6,9 +6,23 @@ pub fn error_header(content: &str) -> String {
 }
 
 pub fn ok_header(content: &str) -> String {
+    ok_header_with_headers(content, "")
+}
+pub fn ok_header_with_headers(content: &str, headers: &str) -> String {
     format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{content}",
-        content.len()
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{}\r\n{content}",
+        content.len(),
+        headers
+    )
+}
+
+pub fn redirect_header(location: &str) -> String {
+    redirect_header_with_headers(location, "")
+}
+pub fn redirect_header_with_headers(location: &str, headers: &str) -> String {
+    format!(
+        "HTTP/1.1 302 FOUND\r\nLocation: {}\r\n{}",
+        location, headers
     )
 }
 

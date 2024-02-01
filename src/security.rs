@@ -1,5 +1,6 @@
 use crate::{RSAKey, SharedMem};
 
+use crate::util::find_header_val;
 use rsa::{
     pkcs8::{EncodePublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
@@ -9,7 +10,6 @@ use ::rsa::{sha2::Sha256, Oaep};
 
 use base64::{engine::general_purpose, Engine as _};
 
-use crate::util::find_val;
 // Decrypts a value from the request header
 pub fn decrypt_header(
     request_header: &Vec<String>,
@@ -17,18 +17,17 @@ pub fn decrypt_header(
     header: &str,
 ) -> Result<String, String> {
     // Finds the encrypted message in the request header
-    let m_encrypted_base64: String = match find_val(request_header, header) {
+    let m_encrypted_base64: String = match find_header_val(request_header, header) {
         Some(m) => m,
         None => return Err("No key".to_string()),
     };
 
     // Decrypts the base64 encoded RSA encrypted message
-    let m_decrypted_string = match decrypt_base64(m_encrypted_base64, &shared_mem.rsa_key.private_key) {
-        Ok(s) => s,
-        Err(err) => return Err(err),
-    };
-
-    println!("{m_decrypted_string}");
+    let m_decrypted_string =
+        match decrypt_base64(m_encrypted_base64, &shared_mem.rsa_key.private_key) {
+            Ok(s) => s,
+            Err(err) => return Err(err),
+        };
 
     Ok(m_decrypted_string)
 }
@@ -66,7 +65,7 @@ pub fn generate_key_pair() -> RSAKey {
     let pub_key_encoded = pub_key
         .to_public_key_pem(LineEnding::CRLF)
         .expect("Failed to encode public key");
-    
+
     RSAKey {
         public_key: pub_key,
         public_key_encoded: pub_key_encoded,
