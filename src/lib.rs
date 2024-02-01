@@ -62,6 +62,7 @@ impl ThreadPool {
         let job = Box::new(f);
 
         // Sends the function to the thread that has the mutex lock
+        // Should handle errors better
         self.sender.as_ref().unwrap().send(job).unwrap();
     }
 }
@@ -100,7 +101,7 @@ impl Worker {
             match message {
                 // If the message is Ok execute the function
                 Ok(job) => {
-                    println!("Worker {id} got a job; executing.");
+                    //println!("Worker {id} got a job; executing.");
 
                     // If the job returns Err print the error (right now only prints that it is an error)
                     if job().is_err() {
@@ -123,7 +124,12 @@ impl Worker {
 }
 
 pub struct SharedMem {
+    pub rsa_key: RSAKey
+}
+
+pub struct RSAKey{
     pub public_key_encoded: String,
     pub public_key: RsaPublicKey,
     pub private_key: RsaPrivateKey,
 }
+

@@ -16,3 +16,12 @@ pub fn check_key(key: String, correct_key: &str) -> Result<(), String> {
 
     Ok(())
 }
+
+
+// Returns the URL found in a request header
+// Example: GET /text/javascript/script.js HTTP/1.1
+// First removes: "GET " then: " HTTP/1.1" and returns: /text/javascript/script.js
+pub fn find_url_from_header(header: &str) -> Option<&str>{
+    let last_part = &header[header.find('/')?..];
+    Some(&last_part[..last_part.find(' ')?])
+}
