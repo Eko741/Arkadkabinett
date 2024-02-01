@@ -24,12 +24,9 @@ function handle_response(request) {
 	else color_alert(info_box, "#ffaaaa", "#ff2222");
 }
 
-function sendAPIRequest(API, key) {
+function sendAPIRequest(API) {
 	const request = new XMLHttpRequest();
 	request.open("GET", "API/" + API, true);
-
-	//startRequest.setRequestHeader("Key", document.getElementById("key").value);
-	request.setRequestHeader("Key_Encrypted", encrypt_data(key));
 
 	request.send();
 
@@ -56,15 +53,15 @@ function sendAPIRequest(API, key) {
 }
 
 function start() {
-	sendAPIRequest("start", document.getElementById("key").value);
+	sendAPIRequest("start");
 }
 
 function stop() {
-	sendAPIRequest("stop", document.getElementById("key").value);
+	sendAPIRequest("stop");
 }
 
 function test() {
-	sendAPIRequest("test", document.getElementById("key").value);
+	sendAPIRequest("test");
 }
 
 function logout() {

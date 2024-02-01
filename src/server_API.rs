@@ -63,9 +63,6 @@ pub fn login(form_data: &HashMap<&str, &str>) -> String {
 }
 
 pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> String {
-    println!("Protected content from file");
-    println!("{:?}", header.join("-"));
-
     let cookies = match find_header_val(&header, "Cookie") {
         Some(s) => s,
         None => return redirect_header("/login"),
@@ -95,15 +92,14 @@ pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> Stri
     }
 
     match filename {
-        "" => content_from_file("admin/index.html"),
-        _ => content_from_file(("admin/".to_string() + filename).as_str()),
+        "/admin" => htpp_response_from_file("/admin/index.html"),
+        _ => htpp_response_from_file(filename),
     }
 }
 
 // Generates an HTML response from a source file. If the passed source file does exist returns 404
 pub fn htpp_response_from_file(filename: &str) -> String {
-    
-    // !! 
+    // !!
     //Should check for security issues in the filename. Sigge varsegod.
     // !!
 
@@ -115,22 +111,31 @@ pub fn htpp_response_from_file(filename: &str) -> String {
     };
 
     // Finds postion of last '/' to extract to content type from the filename
-    let pos = match filename.rfind('/')  {
+    let pos = match filename.rfind('/') {
         Some(pos) => pos,
-        None => return error_header(fs::read_to_string("files/404.html").expect("No 404 file").as_str())
+        None => {
+            return error_header(
+                fs::read_to_string("files/404.html")
+                    .expect("No 404 file")
+                    .as_str(),
+            )
+        }
     };
 
-    // Extracts the content type from the filename. 
+    // Extracts the content type from the filename.
     // If there is no content type in the filename assume it's an HTML file
-    let content_type = 
-        if pos == 0 {
-            "text/html"
-        } else {
-            &filename[1..pos]
-        };
+    let content_type = if pos == 0 {
+        "text/html"
+    } else {
+        &filename[1..pos]
+    };
 
     match fs::read_to_string(format!("files/{filename}")) {
         Ok(content) => ok_header_content_type(content.as_str(), content_type),
-        Err(_) => error_header(fs::read_to_string("files/404.html").expect("No 404 file").as_str())
+        Err(_) => error_header(
+            fs::read_to_string("files/404.html")
+                .expect("No 404 file")
+                .as_str(),
+        ),
     }
 }

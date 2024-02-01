@@ -8,17 +8,12 @@ use std::{
 
 use arkadkabinett::server_API::*;
 use arkadkabinett::util::find_cookie_val;
+use arkadkabinett::util::find_header_val;
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::SharedMem;
 use arkadkabinett::ThreadPool;
 use arkadkabinett::{security::*, util::find_url_from_header};
-use arkadkabinett::{server_API::*, util::find_header_val};
 use dotenv_codegen::dotenv;
-
-use rsa::{
-    pkcs8::{EncodePublicKey, LineEnding},
-    RsaPrivateKey, RsaPublicKey,
-};
 
 const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
 fn main() {
@@ -65,8 +60,6 @@ fn handle_connection(
 
     let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
 
-    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
-
     let mut form_data: HashMap<&str, &str> = HashMap::new();
     for d in url.split('?').nth(1).unwrap_or("").split('&') {
         let mut data = d.split('=');
@@ -81,26 +74,22 @@ fn handle_connection(
         form_data.insert(key.unwrap(), value.unwrap());
     }
 
+    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
     request_parts.next(); // Skip the domain name/ip adress
 
     let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
     let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
-    println!("{} {}", first_part, second_part);
 
     // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = match first_part {
-        "API" => api_request(second_part, &request_header, &form_data, shared_mem),
-        "admin" => protected_content_from_file(second_part, &request_header),
-        "" => content_from_file("index.html"),
-        _ => content_from_file(first_part),
-    };
-
-    let response: String = if url.starts_with("/API/") {
+    let response: String = if first_part == "API" {
         // If it's an API call
-        api_request(url, &request_header, &form_data, shared_mem)
-    } else if url == "/" {
+        api_request(second_part, &request_header, &form_data, &shared_mem)
+    } else if first_part == "" {
         // If no spcific page was requested return the homepage
-        htpp_response_from_file("/home.hmtl")
+        htpp_response_from_file("/index.html")
+    } else if first_part == "admin" {
+        // If it's an admin page
+        protected_content_from_file(url, &request_header)
     } else {
         // Get content from the file
         htpp_response_from_file(url)
@@ -118,11 +107,8 @@ fn api_request(
     api_name: &str,
     request_header: &Vec<String>,
     form_data: &HashMap<&str, &str>,
-    shared_mem: std::sync::Arc<SharedMem>,
+    shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
-    // Remove "/API/" from the start
-    let api_name = &api_name[5..];
-
     // Non password secured api calls
     match api_name {
         "test" => return error_header("No Testing Underway"),
@@ -160,7 +146,7 @@ fn api_request(
     }
 
     // Password secured API calls
-    match api {
+    match api_name {
         "start" => start_machine(),
         "stop" => stop_machine(),
         _ => error_header("Invalid API call"),
