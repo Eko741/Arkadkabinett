@@ -35,6 +35,12 @@ function test() {
 	sendAPIRequest("test", document.getElementById("key").value);
 }
 
+function logout() {
+	document.cookie =
+		"session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+	location.reload();
+}
+
 function encrypt_data(data) {
 	if (publicKey == "") {
 		const pubKeyRequest = new XMLHttpRequest();
