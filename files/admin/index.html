@@ -1,11 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
+		<<<<<<< HEAD:files/admin.html
 		<link rel="icon" href="/image/svg+xml/favicon.svg" />
 		<script src="/text/javascript/script.js"></script>
-		<script type="text/javascript" src="/text/javascript/forge.min.js"></script>
+		<script
+			type="text/javascript"
+			src="/text/javascript/forge.min.js"
+		></script>
 		<link rel="stylesheet" href="/text/css/style.css" />
 
+		=======
+		<link rel="icon" href="/favicon.svg" />
+		<script src="/script.js"></script>
+		<script type="text/javascript" src="/forge.min.js"></script>
+		<link rel="stylesheet" href="/style.css" />
+		>>>>>>> auth:files/admin/index.html
 		<meta charset="utf-8" />
 		<title>Admin</title>
 	</head>
@@ -13,18 +23,20 @@
 		<div style="width: 100%">
 			<div id="left">
 				<h1>Admin</h1>
-				<label for="key">Key:</label> <br>
-				<input type="text" id="key" name="key" />
 				<div id="info_box">Info</div>
 			</div>
 			<div id="right">
 				<div class="button_container">
-					<button class="admin_button" onclick="start()">Start</button>
+					<button class="admin_button" onclick="start()">
+						Start
+					</button>
 					<button class="admin_button" onclick="stop()">Stop</button>
 					<button class="admin_button" onclick="test()">Test</button>
 					<button class="admin_button" onclick="WIP()">WIP</button>
 					<button class="admin_button" onclick="WIP()">WIP</button>
-					<button class="admin_button" onclick="WIP()">WIP</button>
+					<button class="admin_button" onclick="logout()">
+						Log Out
+					</button>
 				</div>
 			</div>
 		</div>
