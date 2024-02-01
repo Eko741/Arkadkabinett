@@ -1,19 +1,24 @@
+use sha256::digest;
 use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use arkadkabinett::security::*;
-use arkadkabinett::server_API::*;
+use arkadkabinett::util::find_cookie_val;
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::SharedMem;
 use arkadkabinett::ThreadPool;
+use arkadkabinett::{server_API::*, util::find_header_val};
+use dotenv_codegen::dotenv;
 
 use rsa::{
     pkcs8::{EncodePublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
 };
+
+const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
 
 fn main() {
     // Generates a private and public RSA key. Stores them and a PEM representation of the public key
@@ -124,18 +129,47 @@ fn api_request(
         _ => (),
     }
 
-    // Gets password returns error if no key is found
-    let key = decrypt_header(request_header, &shared_mem, "Key_Encrypted");
+    let cookies = match find_header_val(&request_header, "Cookie") {
+        Some(s) => s,
+        None => {
+            println!("No cookies");
+            return redirect_header("/login");
+        }
+    }
+    .split("; ")
+    .map(String::from)
+    .collect();
 
-    let key = match key {
-        Ok(k) => k,
-        Err(err) => return unauthorized_header(&err),
+    let session = match find_cookie_val(&cookies, "session") {
+        Some(s) => s,
+        None => {
+            println!("No session");
+            return redirect_header("/login");
+        }
     };
+    let session_created: u64 = match find_cookie_val(&cookies, "session-created") {
+        Some(s) => s.parse().unwrap(),
+        None => {
+            println!("No session created");
+            return redirect_header("/login");
+        }
+    };
+
+    let session_active = (session_created + 3600)
+        > SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+    let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
+
+    if !session_active || !correct_hash {
+        return redirect_header("/login");
+    }
 
     // Password secured API calls
     match api {
-        "start" => start_machine(key),
-        "stop" => stop_machine(key),
+        "start" => start_machine(),
+        "stop" => stop_machine(),
         _ => error_header("Invalid API call"),
     }
 }

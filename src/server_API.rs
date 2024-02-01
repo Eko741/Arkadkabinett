@@ -1,4 +1,4 @@
-use crate::util::{check_key, find_cookie_val, find_header_val};
+use crate::util::{find_cookie_val, find_header_val};
 use crate::HTML_helpers::*;
 use dotenv_codegen::dotenv;
 use sha256::digest;
@@ -11,14 +11,7 @@ use std::{
 
 const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
 
-pub fn start_machine(key: String) -> String {
-    // Check if key is correct. Else return error header
-    let is_key_correct = check_key(key, ADMIN_KEY);
-
-    if let Err(err) = is_key_correct {
-        return err;
-    }
-
+pub fn start_machine() -> String {
     // Execute shell script to turn on machine input and output
     match Command::new("sh")
         .arg("-c")
@@ -31,14 +24,7 @@ pub fn start_machine(key: String) -> String {
     }
 }
 
-pub fn stop_machine(key: String) -> String {
-    // Check if key is correct. Else return error header
-    let is_key_correct = check_key(key, ADMIN_KEY);
-
-    if let Err(err) = is_key_correct {
-        return err;
-    }
-
+pub fn stop_machine() -> String {
     // Execute shell script to turn off machine input and output
     match Command::new("sh")
         .arg("-c")
@@ -106,14 +92,14 @@ pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> Stri
         }
     };
 
-    let sessionActive = (session_created + 3600)
+    let session_active = (session_created + 3600)
         > SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
-    let correctHash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
+    let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
 
-    if !sessionActive || !correctHash {
+    if !session_active || !correct_hash {
         return redirect_header("/login");
     }
 
