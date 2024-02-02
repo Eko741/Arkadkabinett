@@ -20,11 +20,11 @@
  - Passwords are stored hashed
 
 ## Encryption
-Client requests public key. 
-Host sends public key
-Client generates symmetric key
-Client sends symmetric key encrypted with public key
-Host decrypts symmetric key and uses it for further encrypted commmunication
+- Client requests public key. 
+- Host sends public key
+- Client generates symmetric key
+- Client sends symmetric key encrypted with public key
+- Host decrypts symmetric key and uses it for further encrypted commmunication
 
 ## Changes 
  - Only path to the OS is reading files. Therefore URL needs to be cleaned 
