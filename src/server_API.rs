@@ -1,8 +1,9 @@
-use crate::util::{find_cookie_val, find_header_val};
+use crate::util::find_cookie_val;
 use crate::HTML_helpers::*;
 use dotenv_codegen::dotenv;
 use sha256::digest;
 use std::{
+    collections::HashMap,
     fs,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
@@ -36,14 +37,8 @@ pub fn stop_machine() -> String {
     }
 }
 
-pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> String {
-    let cookies = match find_header_val(&header, "Cookie") {
-        Some(s) => s,
-        None => return redirect_header("/login"),
-    }
-    .split("; ")
-    .map(String::from)
-    .collect();
+pub fn protected_content_from_file(filename: &str, header: &HashMap<String, String>) -> String {
+    let cookies = header["Cookie"].split("; ").map(String::from).collect();
 
     let session = match find_cookie_val(&cookies, "session") {
         Some(s) => s,

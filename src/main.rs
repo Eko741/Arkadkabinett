@@ -1,5 +1,6 @@
 use sha256::digest;
 use std::{
+    collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     time::{SystemTime, UNIX_EPOCH},
@@ -7,7 +8,6 @@ use std::{
 
 use arkadkabinett::server_API::*;
 use arkadkabinett::util::find_cookie_val;
-use arkadkabinett::util::find_header_val;
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::SharedMem;
 use arkadkabinett::ThreadPool;
@@ -41,23 +41,35 @@ fn handle_connection(
     let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
 
     // Push all the data from the buffer reader to the more convinient vector
-    let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
+    let mut request_header: HashMap<String, String> = HashMap::new();
 
-    for line in buf_reader.flatten() {
+    for (i, line) in buf_reader.flatten().enumerate() {
         if line.is_empty() {
             // If it is the buffer is empty and if we don't break it will wait indefinetly
             break;
-        } else {
-            request_header.push(line);
         }
-    }
+
+        let mut line_parts = line.split(": "); // Split the line into two parts
+
+        // insert the two parts into the hashmap
+        request_header.insert(
+            if i == 0 {
+                "Location".to_string()
+            } else {
+                line_parts.next().unwrap_or(&"").to_string()
+            },
+            line_parts.next().unwrap_or(&"").to_string(),
+        );
+    } // Create vector for all header data inefficient but easy and clean to handle
+
+    println!("Connection established");
 
     // Check that the request header isn't empty
     if request_header.is_empty() {
         return Ok(());
     }
 
-    let url = find_url_from_header(request_header[0].as_str())
+    let url = find_url_from_header(request_header.get("Location").unwrap())
         .unwrap_or("/")
         .split('?')
         .nth(0)
@@ -94,7 +106,7 @@ fn handle_connection(
 
 fn api_request(
     api_name: &str,
-    request_header: &Vec<String>,
+    request_header: &HashMap<String, String>,
     shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
@@ -104,13 +116,12 @@ fn api_request(
         _ => (),
     }
 
-    let cookies = match find_header_val(&request_header, "Cookie") {
-        Some(s) => s,
-        None => return unauthorized_header("No cookies"),
-    }
-    .split("; ")
-    .map(String::from)
-    .collect();
+    let cookies = request_header
+        .get("Cookie")
+        .unwrap_or(&"".to_string())
+        .split("; ")
+        .map(String::from)
+        .collect();
 
     let session = match find_cookie_val(&cookies, "session") {
         Some(s) => s,
