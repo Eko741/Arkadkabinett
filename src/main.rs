@@ -1,6 +1,5 @@
 use sha256::digest;
 use std::{
-    collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     time::{SystemTime, UNIX_EPOCH},
@@ -58,21 +57,11 @@ fn handle_connection(
         return Ok(());
     }
 
-    let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
-
-    let mut form_data: HashMap<&str, &str> = HashMap::new();
-    for d in url.split('?').nth(1).unwrap_or("").split('&') {
-        let mut data = d.split('=');
-
-        let key = data.next();
-        let value = data.next();
-
-        if (key.is_none()) || (value.is_none()) {
-            continue;
-        }
-
-        form_data.insert(key.unwrap(), value.unwrap());
-    }
+    let url = find_url_from_header(request_header[0].as_str())
+        .unwrap_or("/")
+        .split('?')
+        .nth(0)
+        .unwrap_or("/");
 
     let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
     request_parts.next(); // Skip the domain name/ip adress
@@ -83,7 +72,7 @@ fn handle_connection(
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = if first_part == "API" {
         // If it's an API call
-        api_request(second_part, &request_header, &form_data, &shared_mem)
+        api_request(second_part, &request_header, &shared_mem)
     } else if first_part == "" {
         // If no spcific page was requested return the homepage
         htpp_response_from_file("/index.html")
@@ -106,14 +95,12 @@ fn handle_connection(
 fn api_request(
     api_name: &str,
     request_header: &Vec<String>,
-    form_data: &HashMap<&str, &str>,
     shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
     match api_name {
         "test" => return error_header("No Testing Underway"),
         "RSA_Key" => return ok_header(shared_mem.rsa_key.public_key_encoded.as_str()),
-        "login" => return login(form_data),
         _ => (),
     }
 
@@ -129,7 +116,7 @@ fn api_request(
         Some(s) => s,
         None => return unauthorized_header("No session"),
     };
-    let session_created: u64 = match find_cookie_val(&cookies, "session-created") {
+    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
         Some(s) => s.parse().unwrap(),
         None => return unauthorized_header("No session"),
     };
@@ -138,7 +125,7 @@ fn api_request(
         > SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs();
+            .as_millis();
     let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
 
     if !session_active || !correct_hash {

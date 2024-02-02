@@ -3,7 +3,6 @@ use crate::HTML_helpers::*;
 use dotenv_codegen::dotenv;
 use sha256::digest;
 use std::{
-    collections::HashMap,
     fs,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
@@ -37,31 +36,6 @@ pub fn stop_machine() -> String {
     }
 }
 
-pub fn login(form_data: &HashMap<&str, &str>) -> String {
-    let password = match form_data.get("password") {
-        Some(p) => p,
-        None => return error_header("No password"),
-    };
-
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    let session = digest(format!("{}{}", password, time));
-
-    redirect_header_with_headers(
-        "/admin",
-        format!(
-            "Set-Cookie: session={}; Path=/; Max-Age={}\r\nSet-Cookie: session-created={:?}; Path=/; Max-Age={}\r\n",
-            session,
-            3600,
-            time,
-            3600
-        )
-        .as_str(),
-    )
-}
-
 pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> String {
     let cookies = match find_header_val(&header, "Cookie") {
         Some(s) => s,
@@ -73,22 +47,22 @@ pub fn protected_content_from_file(filename: &str, header: &Vec<String>) -> Stri
 
     let session = match find_cookie_val(&cookies, "session") {
         Some(s) => s,
-        None => return redirect_header("/login"),
+        None => return redirect_header("/login?error=No session cookie"),
     };
-    let session_created: u64 = match find_cookie_val(&cookies, "session-created") {
+    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
         Some(s) => s.parse().unwrap(),
-        None => return redirect_header("/login"),
+        None => return redirect_header("/login?error=No session created cookie"),
     };
 
-    let session_active = (session_created + 3600)
+    let session_active = (session_created + 3600000)
         > SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs();
+            .as_millis();
     let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
 
     if !session_active || !correct_hash {
-        return redirect_header("/login");
+        return redirect_header("/login?error=Session expired or incorrect hash");
     }
 
     match filename {

@@ -2,6 +2,7 @@
 <html lang="en">
 	<head>
 		<link rel="stylesheet" href="/text/css/style.css" />
+		<script src="/text/javascript/script.js"></script>
 		<link
 			rel="icon"
 			type="image/svg+xml"
@@ -13,10 +14,10 @@
 	<body>
 		<h1>Login</h1>
 
-		<form action="API/login">
-			<label for="password">Password:</label>
-			<input type="password" id="password" name="password" />
-			<input type="submit" value="Login" />
-		</form>
+		<label for="password">Password:</label>
+		<input type="password" id="password" name="password" />
+		<input type="submit" value="Login" onclick="login()" />
+
+		<p id="error"></p>
 	</body>
 </html>
