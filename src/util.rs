@@ -16,9 +16,6 @@ pub fn find_val(
     None
 }
 
-pub fn find_header_val(vector: &Vec<String>, pattern: &str) -> Option<String> {
-    find_val(vector, pattern, 2)
-}
 pub fn find_cookie_val(vector: &Vec<String>, pattern: &str) -> Option<String> {
     find_val(vector, pattern, 1)
 }
@@ -32,11 +29,10 @@ pub fn check_key(key: String, correct_key: &str) -> Result<(), String> {
     Ok(())
 }
 
-
 // Returns the URL found in a request header
 // Example: GET /text/javascript/script.js HTTP/1.1
 // First removes: "GET " then: " HTTP/1.1" and returns: /text/javascript/script.js
-pub fn find_url_from_header(header: &str) -> Option<&str>{
+pub fn find_url_from_header(header: &str) -> Option<&str> {
     let last_part = &header[header.find('/')?..];
     Some(&last_part[..last_part.find(' ')?])
 }

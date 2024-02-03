@@ -8,7 +8,6 @@ use std::{
 
 use arkadkabinett::server_API::*;
 use arkadkabinett::util::find_cookie_val;
-use arkadkabinett::util::find_header_val;
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::SharedMem;
 use arkadkabinett::ThreadPool;
@@ -42,37 +41,39 @@ fn handle_connection(
     let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
 
     // Push all the data from the buffer reader to the more convinient vector
-    let mut request_header: Vec<String> = Vec::new(); // Create vector for all header data inefficient but easy and clean to handle
+    let mut request_header: HashMap<String, String> = HashMap::new();
 
-    for line in buf_reader.flatten() {
+    for (i, line) in buf_reader.flatten().enumerate() {
         if line.is_empty() {
             // If it is the buffer is empty and if we don't break it will wait indefinetly
             break;
-        } else {
-            request_header.push(line);
         }
-    }
+
+        let mut line_parts = line.split(": "); // Split the line into two parts
+
+        // insert the two parts into the hashmap
+        request_header.insert(
+            if i == 0 {
+                "Location".to_string()
+            } else {
+                line_parts.next().unwrap_or(&"").to_string()
+            },
+            line_parts.next().unwrap_or(&"").to_string(),
+        );
+    } // Create vector for all header data inefficient but easy and clean to handle
+
+    println!("Connection established");
 
     // Check that the request header isn't empty
     if request_header.is_empty() {
         return Ok(());
     }
 
-    let url = find_url_from_header(request_header[0].as_str()).unwrap_or("/");
-
-    let mut form_data: HashMap<&str, &str> = HashMap::new();
-    for d in url.split('?').nth(1).unwrap_or("").split('&') {
-        let mut data = d.split('=');
-
-        let key = data.next();
-        let value = data.next();
-
-        if (key.is_none()) || (value.is_none()) {
-            continue;
-        }
-
-        form_data.insert(key.unwrap(), value.unwrap());
-    }
+    let url = find_url_from_header(request_header.get("Location").unwrap())
+        .unwrap_or("/")
+        .split('?')
+        .nth(0)
+        .unwrap_or("/");
 
     let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
     request_parts.next(); // Skip the domain name/ip adress
@@ -83,7 +84,7 @@ fn handle_connection(
     // Sorts the types of requests. If no spcific page was requested return the homepage
     let response: String = if first_part == "API" {
         // If it's an API call
-        api_request(second_part, &request_header, &form_data, &shared_mem)
+        api_request(second_part, &request_header, &shared_mem)
     } else if first_part == "" {
         // If no spcific page was requested return the homepage
         htpp_response_from_file("/index.html")
@@ -105,31 +106,28 @@ fn handle_connection(
 
 fn api_request(
     api_name: &str,
-    request_header: &Vec<String>,
-    form_data: &HashMap<&str, &str>,
+    request_header: &HashMap<String, String>,
     shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
     match api_name {
         "test" => return error_header("No Testing Underway"),
         "RSA_Key" => return ok_header(shared_mem.rsa_key.public_key_encoded.as_str()),
-        "login" => return login(form_data),
         _ => (),
     }
 
-    let cookies = match find_header_val(&request_header, "Cookie") {
-        Some(s) => s,
-        None => return unauthorized_header("No cookies"),
-    }
-    .split("; ")
-    .map(String::from)
-    .collect();
+    let cookies = request_header
+        .get("Cookie")
+        .unwrap_or(&"".to_string())
+        .split("; ")
+        .map(String::from)
+        .collect();
 
     let session = match find_cookie_val(&cookies, "session") {
         Some(s) => s,
         None => return unauthorized_header("No session"),
     };
-    let session_created: u64 = match find_cookie_val(&cookies, "session-created") {
+    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
         Some(s) => s.parse().unwrap(),
         None => return unauthorized_header("No session"),
     };
@@ -138,7 +136,7 @@ fn api_request(
         > SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs();
+            .as_millis();
     let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
 
     if !session_active || !correct_hash {

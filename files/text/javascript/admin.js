@@ -3,6 +3,12 @@ var publicKeyPEM;
 var publicKey = "";
 
 window.addEventListener("load", function () {
+	const urlParams = new URLSearchParams(window.location.search);
+	const errorParam = urlParams.get("error");
+	if (errorParam) {
+		document.getElementById("error").innerHTML = "Error: " + errorParam;
+	}
+
 	pki = forge.pki;
 });
 
@@ -37,7 +43,7 @@ function sendAPIRequest(API) {
 
 function displayInfo() {}
 
-function sendAPIRequest(API, key) {
+function sendAPIRequest(API, password) {
 	const request = new XMLHttpRequest();
 	request.open("GET", "API/" + API, true);
 	request.send();
@@ -64,31 +70,32 @@ function test() {
 	sendAPIRequest("test");
 }
 
+function login() {
+	var password = document.getElementById("password").value;
+
+	// get current time in seconds since the unix epoch
+	var currentTime = Date.now();
+
+	hash(password + currentTime).then((hash) => {
+		document.cookie = "session=" + hash + "; path=/;";
+		document.cookie = "session-created=" + currentTime + "; path=/;";
+		location.replace("/admin");
+	});
+}
+
 function logout() {
 	document.cookie =
 		"session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 	location.reload();
 }
 
-function encrypt_data(data) {
-	if (publicKey == "") {
-		const pubKeyRequest = new XMLHttpRequest();
+async function hash(string) {
+	const utf8 = new TextEncoder().encode(string);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", utf8);
 
-		pubKeyRequest.open("GET", "API/RSA_Key", false);
-
-		pubKeyRequest.send();
-
-		publicKeyPEM = pubKeyRequest.response;
-		publicKey = pki.publicKeyFromPem(publicKeyPEM);
-	}
-
-	var encrypted = publicKey.encrypt(data, "RSA-OAEP", {
-		md: forge.md.sha256.create(),
-	});
-
-	encrypted = forge.util.encode64(encrypted);
-
-	console.log(encrypted);
-
-	return encrypted;
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	const hashHex = hashArray
+		.map((bytes) => bytes.toString(16).padStart(2, "0"))
+		.join("");
+	return hashHex;
 }

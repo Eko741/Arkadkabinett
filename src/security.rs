@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use crate::{RSAKey, SharedMem};
 
-use crate::util::find_header_val;
 use rsa::{
     pkcs8::{EncodePublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
@@ -12,15 +13,12 @@ use base64::{engine::general_purpose, Engine as _};
 
 // Decrypts a value from the request header
 pub fn decrypt_header(
-    request_header: &Vec<String>,
+    request_header: &HashMap<String, String>,
     shared_mem: &std::sync::Arc<SharedMem>,
     header: &str,
 ) -> Result<String, String> {
     // Finds the encrypted message in the request header
-    let m_encrypted_base64: String = match find_header_val(request_header, header) {
-        Some(m) => m,
-        None => return Err("No key".to_string()),
-    };
+    let m_encrypted_base64: String = request_header.get(header).unwrap().to_string();
 
     // Decrypts the base64 encoded RSA encrypted message
     let m_decrypted_string =
