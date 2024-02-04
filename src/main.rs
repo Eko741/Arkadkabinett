@@ -33,28 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(handle_connection(stream, acceptor.clone()));
     }
 }
-async fn handle_client(stream: tokio::net::TcpStream, acceptor: TlsAcceptor) -> Result<(),()> {
-    let mut stream = match acceptor.accept(stream).await {
-        Ok(stream) => stream,
-        Err(err) => 
-        {
-            println!("{}", err);
-            return Err(());
-        } 
-    };
-    // Handle the stream (read/write)
-    
-    stream.write_all(
-        &b"HTTP/1.0 200 ok\r\n\
-    Connection: close\r\n\
-    Content-length: 12\r\n\
-    \r\n\
-    Hello world!"[..],
-    )
-    .await.expect("write did something wrong");
-
-    Ok(())
-}
 
 async fn handle_connection(
     stream: tokio::net::TcpStream,
@@ -154,7 +132,6 @@ fn api_request(
     // Non password secured api calls
     match api_name {
         "test" => return error_header("No Testing Underway"),
-        "RSA_Key" => return ok_header(shared_mem.rsa_key.public_key_encoded.as_str()),
         _ => (),
     }
 

@@ -3,8 +3,6 @@ use std::{
     thread,
 };
 
-use rsa::{RsaPrivateKey, RsaPublicKey};
-
 pub mod security;
 
 #[allow(non_snake_case)]
@@ -124,12 +122,5 @@ impl Worker {
 }
 
 pub struct SharedMem {
-    pub rsa_key: RSAKey
+    pub placeholder: () 
 }
-
-pub struct RSAKey{
-    pub public_key_encoded: String,
-    pub public_key: RsaPublicKey,
-    pub private_key: RsaPrivateKey,
-}
-
