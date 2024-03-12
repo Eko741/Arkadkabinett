@@ -1,7 +1,9 @@
 use std::{
-    sync::{mpsc, Arc, Mutex},
-    thread,
+    collections::HashMap, net::TcpStream, sync::{mpsc, Arc, Mutex}, thread
 };
+
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, ReadHalf};
+use tokio_rustls::client::TlsStream;
 
 pub mod security;
 
@@ -121,6 +123,43 @@ impl Worker {
     }
 }
 
+type reader = tokio::io::ReadHalf<tokio_rustls::server::TlsStream<tokio::net::TcpStream>>;
+
+pub async fn produce_request_form_stream(mut stream: reader) -> HashMap<String, String>{
+    let mut buffered_stream = tokio::io::BufReader::new(stream).lines();
+    let mut request_header: HashMap<String, String> = HashMap::new();
+    
+    let mut i = 0;
+    while let Some(line) = buffered_stream.next_line().await.unwrap() {
+        if line.is_empty(){
+            break;
+        }
+        let mut line_parts = line.split(": "); // Split the line into two parts
+
+        // insert the two parts into the hashmap
+        request_header.insert(
+            if i == 0 {
+                "Location".to_string()
+            } else {
+                line_parts.next().unwrap_or(&"").to_string()
+            },
+            line_parts.next().unwrap_or(&"").to_string(),
+        );
+
+        println!("{}", line);
+        i += 1;
+    }
+    
+
+    request_header
+}
+
 pub struct SharedMem {
     pub placeholder: () 
+}
+
+pub struct Request{
+    url: String,
+    method: String, // Could be an enum.
+    request_header: HashMap<String, String>,
 }

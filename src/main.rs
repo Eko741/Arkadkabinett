@@ -1,12 +1,13 @@
 use rustls::{server::NoClientAuth, ServerConfig};
 use tokio::net::TcpListener;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::{split, AsyncReadExt, AsyncWriteExt};
 use tokio_rustls::{Accept, TlsAcceptor};
 
 use arkadkabinett::HTML_helpers::*;
 use arkadkabinett::server_API::*;
 use arkadkabinett::util::*;
 use arkadkabinett::SharedMem;
+use arkadkabinett::produce_request_form_stream;
 use tokio::io::BufReader;
 use std::collections::HashMap;
 use std::io::Read;
@@ -30,15 +31,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     loop {
         let (stream, _) = listener.accept().await?;
-        tokio::spawn(handle_connection(stream, acceptor.clone()));
+        tokio::spawn(handle_client(stream, acceptor.clone()));
     }
 }
 
-async fn handle_connection(
-    stream: tokio::net::TcpStream,
-    acceptor: TlsAcceptor,
-    //shared_mem: std::sync::Arc<SharedMem>,
-) -> Result<(), ()> {
+async fn handle_client(stream: tokio::net::TcpStream, acceptor: TlsAcceptor) -> Result<(),()> {
     let mut stream = match acceptor.accept(stream).await {
         Ok(stream) => stream,
         Err(err) => 
@@ -47,8 +44,70 @@ async fn handle_connection(
             return Err(());
         } 
     };
-    let mut buffer = [0; 1000];
-    let n = stream.read(&mut buffer[..]).await.unwrap();
+
+    let (mut reader, mut writer) = split(stream);
+
+    let request_header = produce_request_form_stream(reader).await;
+    
+    if request_header.is_empty() {
+        return Ok(());
+    }
+
+    let url = find_url_from_header(request_header.get("Location").unwrap())
+        .unwrap_or("/")
+        .split('?')
+        .nth(0)
+        .unwrap_or("/");
+
+    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
+        request_parts.next(); // Skip the domain name/ip adress
+
+    
+    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
+    let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
+    
+    // Sorts the types of requests. If no spcific page was requested return the homepage
+    let response: String = if first_part == "API" {
+            // If it's an API call
+        api_request(second_part, &request_header)
+    } else if first_part == "" {
+        // If no spcific page was requested return the homepage
+        htpp_response_from_file("/index.html")
+    } else if first_part == "admin" {
+        // If it's an admin page
+        protected_content_from_file(url, &request_header)
+    } else {
+        // Get content from the file
+        htpp_response_from_file(url)
+    };
+    
+    // Writes the output to the TCP socket
+    // Should handle error better.
+    writer.write_all(response.as_bytes()).await.unwrap();
+    
+    //Returns an empty Ok
+    Ok(())
+}
+
+async fn handle_connection(
+    stream: tokio::net::TcpStream,
+    acceptor: TlsAcceptor,
+    //shared_mem: std::sync::Arc<SharedMem>,
+) -> Result<(), ()> {
+    let stream = match acceptor.accept(stream).await {
+        Ok(stream) => stream,
+        Err(err) => 
+        {
+            println!("{}", err);
+            return Err(());
+        } 
+    };
+
+    let (mut reader, mut writer) = split(stream);
+    let mut buffer = [0; 500];
+    
+
+    let n = reader.read(&mut buffer).await.unwrap();
     println!("{n}");
     println!("{:?}", buffer);
    
@@ -117,7 +176,7 @@ async fn handle_connection(
 
     // Writes the output to the TCP socket
     // Should handle error better.
-    stream.write_all(response.as_bytes()).await.unwrap();
+    writer.write_all(response.as_bytes()).await.unwrap();
     
     
     //Returns an empty Ok
@@ -127,7 +186,6 @@ async fn handle_connection(
 fn api_request(
     api_name: &str,
     request_header: &HashMap<String, String>,
-    shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
     match api_name {
