@@ -79,6 +79,8 @@ pub fn htpp_response_from_file(filename: &str) -> String {
         filename.to_string()
     };
 
+    println!("{}", filename);
+
     // Finds postion of last '/' to extract to content type from the filename
     let pos = match filename.rfind('/') {
         Some(pos) => pos,
@@ -96,7 +98,7 @@ pub fn htpp_response_from_file(filename: &str) -> String {
     let content_type = if pos == 0 {
         "text/html"
     } else {
-        &filename[1..pos]
+        &filename[0..pos]
     };
 
     match fs::read_to_string(format!("files/{filename}")) {

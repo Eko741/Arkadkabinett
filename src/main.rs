@@ -36,148 +36,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_client(stream: tokio::net::TcpStream, acceptor: TlsAcceptor) -> Result<(),()> {
-    let mut stream = match acceptor.accept(stream).await {
-        Ok(stream) => stream,
-        Err(err) => 
-        {
-            println!("{}", err);
-            return Err(());
-        } 
-    };
-
-    let (mut reader, mut writer) = split(stream);
-
-    let request_header = produce_request_form_stream(reader).await;
-    
-    if request_header.is_empty() {
-        return Ok(());
-    }
-
-    let url = find_url_from_header(request_header.get("Location").unwrap())
-        .unwrap_or("/")
-        .split('?')
-        .nth(0)
-        .unwrap_or("/");
-
-    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
-        request_parts.next(); // Skip the domain name/ip adress
-
-    
-    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
-    let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
-    
-    // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = if first_part == "API" {
-            // If it's an API call
-        api_request(second_part, &request_header)
-    } else if first_part == "" {
-        // If no spcific page was requested return the homepage
-        htpp_response_from_file("/index.html")
-    } else if first_part == "admin" {
-        // If it's an admin page
-        protected_content_from_file(url, &request_header)
-    } else {
-        // Get content from the file
-        htpp_response_from_file(url)
-    };
-    
-    // Writes the output to the TCP socket
-    // Should handle error better.
-    writer.write_all(response.as_bytes()).await.unwrap();
-    
-    //Returns an empty Ok
-    Ok(())
-}
-
-async fn handle_connection(
-    stream: tokio::net::TcpStream,
-    acceptor: TlsAcceptor,
-    //shared_mem: std::sync::Arc<SharedMem>,
-) -> Result<(), ()> {
     let stream = match acceptor.accept(stream).await {
         Ok(stream) => stream,
         Err(err) => 
         {
-            println!("{}", err);
+            eprintln!("{}", err);
             return Err(());
         } 
     };
 
-    let (mut reader, mut writer) = split(stream);
-    let mut buffer = [0; 500];
-    
+    let (reader, mut writer) = split(stream);
 
-    let n = reader.read(&mut buffer).await.unwrap();
-    println!("{n}");
-    println!("{:?}", buffer);
-   
-   let vec  = &buffer[..n].to_vec();
-   let content = String::from_utf8(vec.to_vec()).unwrap();
-
-    println!("{}", content);
-    let buf_reader = content.lines(); // Get lines from the buffer
-
-    // Push all the data from the buffer reader to the more convinient vector
-    let mut request_header: HashMap<String, String> = HashMap::new();
-
-    for (i, line) in buf_reader.enumerate() {
-        if line.is_empty() {
-            // If it is the buffer is empty and if we don't break it will wait indefinetly
-            break;
+    let mut request_header =  match produce_request_form_stream(reader).await{
+        Ok(rqh) => rqh,
+        Err(err) => {
+            eprintln!("{}", err);
+            return Err(());
         }
-
-        let mut line_parts = line.split(": "); // Split the line into two parts
-
-        // insert the two parts into the hashmap
-        request_header.insert(
-            if i == 0 {
-                "Location".to_string()
-            } else {
-                line_parts.next().unwrap_or(&"").to_string()
-            },
-            line_parts.next().unwrap_or(&"").to_string(),
-        );
-    } // Create vector for all header data inefficient but easy and clean to handle
-
-    println!("Connection established");
-
-    // Check that the request header isn't empty
-    if request_header.is_empty() {
-        return Ok(());
-    }
-
-    let url = find_url_from_header(request_header.get("Location").unwrap())
-        .unwrap_or("/")
-        .split('?')
-        .nth(0)
-        .unwrap_or("/");
-
-    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
-    request_parts.next(); // Skip the domain name/ip adress
-
-    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
-    let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
-
-    // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = if first_part == "API" {
-        // If it's an API call
-        //api_request(second_part, &request_header, &shared_mem)
-        "asda".to_string()
-    } else if first_part == "" {
-        // If no spcific page was requested return the homepage
-        htpp_response_from_file("/index.html")
-    } else if first_part == "admin" {
-        // If it's an admin page
-        protected_content_from_file(url, &request_header)
-    } else {
-        // Get content from the file
-        htpp_response_from_file(url)
     };
 
+    if !request_header.url.contains('.') {
+        request_header.url.push_str("/index.html");
+    }
+
+    let (first_part, second_part) = match request_header.url.split_once('/'){
+        Some(parts) => parts,
+        None => ("", "")
+    };
+    
+    println!("{}", request_header.url);
+    // Sorts the types of requests. If no spcific page was requested return the homepage
+    let response: String = 
+        if first_part == "API" {
+            // If it's an API call
+            api_request(second_part, &request_header.request_header)
+        } else if first_part == "admin" {
+            // If it's an admin page
+            protected_content_from_file(&request_header.url, &request_header.request_header)
+        } else {
+            // Get content from the file
+            htpp_response_from_file(&request_header.url)
+        };
+    
     // Writes the output to the TCP socket
     // Should handle error better.
     writer.write_all(response.as_bytes()).await.unwrap();
-    
     
     //Returns an empty Ok
     Ok(())
