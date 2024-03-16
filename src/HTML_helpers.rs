@@ -1,55 +1,32 @@
-pub fn error_header(content: &str) -> String {
-    format!(
-        "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\n\r\n{content}",
-        content.len()
-    )
+pub enum HttpResponse {
+    OK,
+    NOTFOUND,
+    UNAUTHORIZED,
+    FOUND,
+    INTERNALSERVERERROR,
+    NOCONTENT
 }
 
-pub fn ok_header(content: &str) -> String {
-    ok_header_with_headers(content, "")
-}
-pub fn ok_header_with_headers(content: &str, headers: &str) -> String {
+pub fn response_header(response_type: HttpResponse, headers: &str, content: &str) -> String{
     format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n{}\r\n{content}",
-        content.len(),
-        headers
+        "HTTP/1.1 {}{}{}",
+        response_type_to_str(response_type),
+        headers,
+        if !content.is_empty(){
+            format!("\r\nContent-Length: {}\r\n\r\n{}", content.len(), content)
+        } else {
+            String::from("\r\n\r\n")
+        }
     )
 }
-
-pub fn redirect_header(location: &str) -> String {
-    redirect_header_with_headers(location, "")
-}
-pub fn redirect_header_with_headers(location: &str, headers: &str) -> String {
-    format!(
-        "HTTP/1.1 302 FOUND\r\nLocation: {}\r\n{}",
-        location, headers
-    )
-}
-
-pub fn unauthorized_header(content: &str) -> String {
-    format!(
-        "HTTP/1.1 401 UNAUTHORIZED\r\nContent-Length: {}\r\n\r\n{content}",
-        content.len()
-    )
-}
-
-pub fn internal_server_error_header(content: &str) -> String {
-    format!(
-        "HTTP/1.1 500 INTERNAL SERVER ERROR\r\nContent-Length: {}\r\n\r\n{content}",
-        content.len()
-    )
-}
-
-pub fn ok_header_content_type(content: &str, content_type: &str) -> String {
-    format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {content_type}\r\n\r\n{content}",
-        content.len()
-    )
-}
-
-pub fn error_header_content_type(content: &str, content_type: &str) -> String {
-    format!(
-        "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: {content_type}\r\n\r\n{content}",
-        content.len()
-    )
+#[inline]
+fn response_type_to_str(response_type: HttpResponse) -> & 'static str{
+    match response_type {
+        HttpResponse::OK => "200 OK",
+        HttpResponse::NOTFOUND => "404 NOT FOUND",
+        HttpResponse::UNAUTHORIZED => "401 UNAUTHORIZED",
+        HttpResponse::FOUND => "302 FOUND",
+        HttpResponse::INTERNALSERVERERROR => "500 INTERNAL SERVER ERROR",
+        HttpResponse::NOCONTENT => "204 NO CONTENT"
+    } 
 }

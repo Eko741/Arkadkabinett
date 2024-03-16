@@ -1,21 +1,13 @@
-use rustls::{server::NoClientAuth, ServerConfig};
+use rustls::ServerConfig;
 use tokio::net::TcpListener;
-use tokio::io::{split, AsyncReadExt, AsyncWriteExt};
-use tokio_rustls::{Accept, TlsAcceptor};
+use tokio::io::{split, AsyncWriteExt};
+use tokio_rustls::TlsAcceptor;
 
-use arkadkabinett::HTML_helpers::*;
+use arkadkabinett::{security, HTML_helpers::*};
 use arkadkabinett::server_API::*;
-use arkadkabinett::util::*;
-use arkadkabinett::SharedMem;
 use arkadkabinett::produce_request_form_stream;
-use tokio::io::BufReader;
 use std::collections::HashMap;
-use std::io::Read;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-use sha256::digest;
 
-const ADMIN_KEY: &str = "test";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,29 +47,25 @@ async fn handle_client(stream: tokio::net::TcpStream, acceptor: TlsAcceptor) -> 
         }
     };
 
+    if request_header.url.ends_with('/'){
+        request_header.url.pop();
+    }
+    
     if !request_header.url.contains('.') {
         request_header.url.push_str("/index.html");
     }
 
     let (first_part, second_part) = match request_header.url.split_once('/'){
         Some(parts) => parts,
-        None => ("", "")
+        None => ("", "index.html")
     };
     
-    println!("{}", request_header.url);
     // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = 
-        if first_part == "API" {
-            // If it's an API call
-            api_request(second_part, &request_header.request_header)
-        } else if first_part == "admin" {
-            // If it's an admin page
-            protected_content_from_file(&request_header.url, &request_header.request_header)
-        } else {
-            // Get content from the file
-            htpp_response_from_file(&request_header.url)
-        };
-    
+    let response: String = match first_part {
+        "API" => api_request(second_part, &request_header.request_header),
+        "secure" => protected_content_from_file(&request_header.url, &request_header.request_header),
+        _ => htpp_response_from_file(&request_header.url, None)        
+    };
     // Writes the output to the TCP socket
     // Should handle error better.
     writer.write_all(response.as_bytes()).await.unwrap();
@@ -91,42 +79,22 @@ fn api_request(
     request_header: &HashMap<String, String>,
 ) -> String {
     // Non password secured api calls
+    
     match api_name {
-        "test" => return error_header("No Testing Underway"),
+        "test.api" => return response_header(HttpResponse::NOTFOUND, "", "No Testing Underway"),
+        "login.api" => return login(request_header),
         _ => (),
     }
 
-    let cookies = request_header
-        .get("Cookie")
-        .unwrap_or(&"".to_string())
-        .split("; ")
-        .map(String::from)
-        .collect();
-
-    let session = match find_cookie_val(&cookies, "session") {
-        Some(s) => s,
-        None => return unauthorized_header("No session"),
-    };
-    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
-        Some(s) => s.parse().unwrap(),
-        None => return unauthorized_header("No session"),
-    };
-
-    let session_active = (session_created + 3600)
-        > SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis();
-    let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
-
-    if !session_active || !correct_hash {
-        return redirect_header("/login");
+    match crate::security::check_privilege(request_header) {
+        Ok(_privilage) => (),
+        Err(err) => return response_header(HttpResponse::UNAUTHORIZED, "", err)
     }
 
     // Password secured API calls
     match api_name {
-        "start" => start_machine(),
-        "stop" => stop_machine(),
-        _ => error_header("Invalid API call"),
+        "start.api" => start_machine(),
+        "stop.api" => stop_machine(),
+        _ => response_header(HttpResponse::NOTFOUND, "", "Invalid API call"),
     }
 }
