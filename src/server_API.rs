@@ -1,15 +1,11 @@
-use crate::util::find_cookie_val;
 use crate::HTML_helpers::*;
-use dotenv_codegen::dotenv;
-use sha256::digest;
 use std::{
     collections::HashMap,
     fs,
     process::Command,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
+use crate::security::*;
 
 pub fn start_machine() -> String {
     // Execute shell script to turn on machine input and output
@@ -18,9 +14,9 @@ pub fn start_machine() -> String {
         .arg("bash /home/pi/bashScripts/start.sh")
         .spawn()
     {
-        Ok(_) => ok_header("Started machine succesfully"),
+        Ok(_) => response_header(HttpResponse::OK, "", "Started machine succesfully"),
 
-        Err(_) => internal_server_error_header("Something went wrong"),
+        Err(_) => response_header(HttpResponse::INTERNALSERVERERROR, "", "Something went wrong"),
     }
 }
 
@@ -31,80 +27,88 @@ pub fn stop_machine() -> String {
         .arg("bash /home/pi/bashScripts/stop.sh")
         .output()
     {
-        Ok(_) => ok_header("Stopped machine succesfully"),
+        Ok(_) => response_header(HttpResponse::OK, "", "Stopped machine succesfully"),
 
-        Err(_) => internal_server_error_header("Something went wrong"),
+        Err(_) => response_header(HttpResponse::INTERNALSERVERERROR, "", "Something went wrong"),
     }
 }
 
-pub fn protected_content_from_file(filename: &str, header: &HashMap<String, String>) -> String {
-    let cookies = header["Cookie"].split("; ").map(String::from).collect();
-
-    let session = match find_cookie_val(&cookies, "session") {
-        Some(s) => s,
-        None => return redirect_header("/login?error=No session cookie"),
-    };
-    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
-        Some(s) => s.parse().unwrap(),
-        None => return redirect_header("/login?error=No session created cookie"),
+pub fn login(request_header: &HashMap<String, String>) -> String{
+    let privilage = match check_privilege(request_header) {
+        Ok(privilage) => privilage,
+        Err(err) => return response_header(HttpResponse::UNAUTHORIZED, "",err)
     };
 
-    let session_active = (session_created + 3600000)
-        > SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis();
-    let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
+    match privilage {
+        Privilege::Admin => response_header(HttpResponse::NOCONTENT, "\r\nRedirect: /secure/admin", ""),
+        Privilege::User => response_header(HttpResponse::NOCONTENT, "\r\nRedirect: /secure/user", ""),
+        Privilege::ElJoelpe => response_header(HttpResponse::NOCONTENT, "\r\nRedirect: /secure/joel", ""),
+    }
+}
 
-    if !session_active || !correct_hash {
-        return redirect_header("/login?error=Session expired or incorrect hash");
+pub fn protected_content_from_file(filename: &str, request_header: &HashMap<String, String>) -> String {
+    
+    match crate::security::check_privilege(request_header) {
+        Ok(_privilage) => (),
+        Err(err) => return htpp_response_from_file("/login.html", Some(vec!(("LoginError", err))))
     }
 
-    match filename {
-        "/admin" => htpp_response_from_file("/admin/index.html"),
-        _ => htpp_response_from_file(filename),
-    }
+    htpp_response_from_file(filename, None)
 }
 
 // Generates an HTML response from a source file. If the passed source file does exist returns 404
-pub fn htpp_response_from_file(filename: &str) -> String {
+pub fn htpp_response_from_file(filename: &str, headers: Option<Vec<(&str, &str)>>) -> String {
     // !!
     //Should check for security issues in the filename. Sigge varsegod.
     // !!
 
-    // If no file extension was given assume it's HTML
-    let filename = if !filename.contains('.') {
-        format!("{filename}.html")
-    } else {
-        filename.to_string()
-    };
+    let mut header_string: String = String::from("");
+    
+    if let Some(headers) = headers {
+
+        for header in headers{
+            header_string.push_str(
+        format!("\r\n{}: {}", 
+                    header.0, 
+                    header.1
+                )
+                .as_str()
+            );
+        }
+    }
 
     // Finds postion of last '/' to extract to content type from the filename
     let pos = match filename.rfind('/') {
         Some(pos) => pos,
         None => {
-            return error_header(
+            return response_header(
+                HttpResponse::NOTFOUND,
+                "",
                 fs::read_to_string("files/404.html")
-                    .expect("No 404 file")
-                    .as_str(),
+                        .expect("No 404 file")
+                        .as_str(),
             )
         }
     };
 
     // Extracts the content type from the filename.
     // If there is no content type in the filename assume it's an HTML file
-    let content_type = if pos == 0 {
+    let content_type = if pos == 0 || filename.starts_with("secure") {
         "text/html"
     } else {
-        &filename[1..pos]
+        &filename[0..pos]
     };
 
+    header_string.push_str(format!("\r\nContent-Type: {}", content_type).as_str());
+    
     match fs::read_to_string(format!("files/{filename}")) {
-        Ok(content) => ok_header_content_type(content.as_str(), content_type),
-        Err(_) => error_header(
+        Ok(content) => response_header(HttpResponse::OK, header_string.as_str(), content.as_str()),
+        Err(_) => response_header(
+            HttpResponse::NOTFOUND,
+            "",
             fs::read_to_string("files/404.html")
-                .expect("No 404 file")
-                .as_str(),
+                    .expect("No 404 file")
+                    .as_str(),
         ),
     }
 }

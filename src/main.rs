@@ -1,105 +1,75 @@
-use sha256::digest;
-use std::{
-    collections::HashMap,
-    io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use rustls::ServerConfig;
+use tokio::net::TcpListener;
+use tokio::io::{split, AsyncWriteExt};
+use tokio_rustls::TlsAcceptor;
 
+use arkadkabinett::{security, HTML_helpers::*};
 use arkadkabinett::server_API::*;
-use arkadkabinett::util::find_cookie_val;
-use arkadkabinett::HTML_helpers::*;
-use arkadkabinett::SharedMem;
-use arkadkabinett::ThreadPool;
-use arkadkabinett::{security::*, util::find_url_from_header};
-use dotenv_codegen::dotenv;
+use arkadkabinett::produce_request_form_stream;
+use std::collections::HashMap;
 
-const ADMIN_KEY: &str = dotenv!("ADMIN_KEY");
-fn main() {
-    // Shared memory that's safely shared across threads. Read only
-    let shared_mem_arc = std::sync::Arc::new(SharedMem {
-        rsa_key: generate_key_pair(), // More read only data can be added through the SharedMem struct
-    });
 
-    // Opens socket for TCP connection. Over is for localhost and under is for production
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    //let listener = TcpListener::bind("0.0.0.0:80").unwrap();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load server certificates
+    let certs = rustls_pemfile::certs(&mut std::io::Cursor::new(include_str!("../localhost.crt"))).flatten().collect();
+    let keys = rustls_pemfile::private_key(&mut std::io::Cursor::new(include_str!("../localhost.key"))).unwrap().unwrap();
+    // Create server configuration
+    let config = ServerConfig::builder().with_no_client_auth().with_single_cert(certs, keys).unwrap();
 
-    let pool = ThreadPool::new(4);
-
-    for stream in listener.incoming().flatten() {
-        // Loops through all incoming TCP connections wait when there are none left
-        let shared_mem_clone = std::sync::Arc::clone(&shared_mem_arc);
-        pool.execute(move || -> Result<(), ()> { handle_connection(stream, shared_mem_clone) });
+    // Create TCP listener and TLS acceptor
+    let acceptor = TlsAcceptor::from(std::sync::Arc::new(config));
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    
+    loop {
+        let (stream, _) = listener.accept().await?;
+        tokio::spawn(handle_client(stream, acceptor.clone()));
     }
 }
 
-fn handle_connection(
-    mut stream: TcpStream,
-    shared_mem: std::sync::Arc<SharedMem>,
-) -> Result<(), ()> {
-    let buf_reader = BufReader::new(&stream).lines(); // Get lines from the buffer
-
-    // Push all the data from the buffer reader to the more convinient vector
-    let mut request_header: HashMap<String, String> = HashMap::new();
-
-    for (i, line) in buf_reader.flatten().enumerate() {
-        if line.is_empty() {
-            // If it is the buffer is empty and if we don't break it will wait indefinetly
-            break;
-        }
-
-        let mut line_parts = line.split(": "); // Split the line into two parts
-
-        // insert the two parts into the hashmap
-        request_header.insert(
-            if i == 0 {
-                "Location".to_string()
-            } else {
-                line_parts.next().unwrap_or(&"").to_string()
-            },
-            line_parts.next().unwrap_or(&"").to_string(),
-        );
-    } // Create vector for all header data inefficient but easy and clean to handle
-
-    println!("Connection established");
-
-    // Check that the request header isn't empty
-    if request_header.is_empty() {
-        return Ok(());
-    }
-
-    let url = find_url_from_header(request_header.get("Location").unwrap())
-        .unwrap_or("/")
-        .split('?')
-        .nth(0)
-        .unwrap_or("/");
-
-    let mut request_parts = url.split('?').nth(0).unwrap_or("/").split('/');
-    request_parts.next(); // Skip the domain name/ip adress
-
-    let first_part = request_parts.next().unwrap_or("404.html"); // Gets the first string after "/"
-    let second_part = request_parts.next().unwrap_or(""); // Gets the second string after "/"
-
-    // Sorts the types of requests. If no spcific page was requested return the homepage
-    let response: String = if first_part == "API" {
-        // If it's an API call
-        api_request(second_part, &request_header, &shared_mem)
-    } else if first_part == "" {
-        // If no spcific page was requested return the homepage
-        htpp_response_from_file("/index.html")
-    } else if first_part == "admin" {
-        // If it's an admin page
-        protected_content_from_file(url, &request_header)
-    } else {
-        // Get content from the file
-        htpp_response_from_file(url)
+async fn handle_client(stream: tokio::net::TcpStream, acceptor: TlsAcceptor) -> Result<(),()> {
+    let stream = match acceptor.accept(stream).await {
+        Ok(stream) => stream,
+        Err(err) => 
+        {
+            eprintln!("{}", err);
+            return Err(());
+        } 
     };
 
+    let (reader, mut writer) = split(stream);
+
+    let mut request_header =  match produce_request_form_stream(reader).await{
+        Ok(rqh) => rqh,
+        Err(err) => {
+            eprintln!("{}", err);
+            return Err(());
+        }
+    };
+
+    if request_header.url.ends_with('/'){
+        request_header.url.pop();
+    }
+    
+    if !request_header.url.contains('.') {
+        request_header.url.push_str("/index.html");
+    }
+
+    let (first_part, second_part) = match request_header.url.split_once('/'){
+        Some(parts) => parts,
+        None => ("", "index.html")
+    };
+    
+    // Sorts the types of requests. If no spcific page was requested return the homepage
+    let response: String = match first_part {
+        "API" => api_request(second_part, &request_header.request_header),
+        "secure" => protected_content_from_file(&request_header.url, &request_header.request_header),
+        _ => htpp_response_from_file(&request_header.url, None)        
+    };
     // Writes the output to the TCP socket
     // Should handle error better.
-    stream.write_all(response.as_bytes()).unwrap();
-
+    writer.write_all(response.as_bytes()).await.unwrap();
+    
     //Returns an empty Ok
     Ok(())
 }
@@ -107,46 +77,24 @@ fn handle_connection(
 fn api_request(
     api_name: &str,
     request_header: &HashMap<String, String>,
-    shared_mem: &std::sync::Arc<SharedMem>,
 ) -> String {
     // Non password secured api calls
+    
     match api_name {
-        "test" => return error_header("No Testing Underway"),
-        "RSA_Key" => return ok_header(shared_mem.rsa_key.public_key_encoded.as_str()),
+        "test.api" => return response_header(HttpResponse::NOTFOUND, "", "No Testing Underway"),
+        "login.api" => return login(request_header),
         _ => (),
     }
 
-    let cookies = request_header
-        .get("Cookie")
-        .unwrap_or(&"".to_string())
-        .split("; ")
-        .map(String::from)
-        .collect();
-
-    let session = match find_cookie_val(&cookies, "session") {
-        Some(s) => s,
-        None => return unauthorized_header("No session"),
-    };
-    let session_created: u128 = match find_cookie_val(&cookies, "session-created") {
-        Some(s) => s.parse().unwrap(),
-        None => return unauthorized_header("No session"),
-    };
-
-    let session_active = (session_created + 3600)
-        > SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis();
-    let correct_hash = session == digest(format!("{}{}", ADMIN_KEY, session_created));
-
-    if !session_active || !correct_hash {
-        return redirect_header("/login");
+    match crate::security::check_privilege(request_header) {
+        Ok(_privilage) => (),
+        Err(err) => return response_header(HttpResponse::UNAUTHORIZED, "", err)
     }
 
     // Password secured API calls
     match api_name {
-        "start" => start_machine(),
-        "stop" => stop_machine(),
-        _ => error_header("Invalid API call"),
+        "start.api" => start_machine(),
+        "stop.api" => stop_machine(),
+        _ => response_header(HttpResponse::NOTFOUND, "", "Invalid API call"),
     }
 }
